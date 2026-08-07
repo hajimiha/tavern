@@ -178,3 +178,12 @@
 | 静态安全扫描 | 0 native dialogs / endpoints / keys / 金叶 | 通过 |
 | 四视口 Edge 检查 | 64 / 64 IDs unique；0 console errors；0 remote requests | 通过 |
 | 地图拖动 | transform changed，底图与热点共用 world layer | 通过 |
+
+## Session: 2026-08-07 · 新手开局、真实 API 与地图热点修复
+
+### 需求与参考图调查
+- **Status:** in_progress
+- 用户要求将富资源演示状态改为真正的新手开局，并将禁用 API 升级为可配置且实际驱动 NPC 文本的模型接口。
+- 检查三张参考图：API 界面需要供应商、端点/密钥、模型、连接测试与状态；地图六宫格可精简。
+- 采用 DeepSeek/通用 OpenAI-compatible 浏览器直连，不使用开发环境密钥；密钥默认会话级，持久化必须由玩家明确开启。
+- 仓库 `main` 与 `origin/main` 同步，基线提交为 `02f619f`；本轮完成后继续提交并推送。
