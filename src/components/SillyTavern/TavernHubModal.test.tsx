@@ -35,6 +35,8 @@ describe('酒馆中枢', () => {
     expect(screen.getByRole('tab', { name: '接口' })).toHaveAttribute('id', 'tavern-tab-api')
     expect(await screen.findByText('浏览器直连提醒')).toBeVisible()
     expect(screen.getByLabelText('API 密钥')).toBeVisible()
+    expect(screen.getByText('LLM API REQUIRED')).toBeVisible()
+    expect(screen.queryByText(/LLM LOCAL|本地叙事/)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: '角色卡' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: /编辑角色卡/ })).toHaveLength(15))

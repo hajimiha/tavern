@@ -225,7 +225,42 @@ export interface MistvaleTavernDefaults {
   settings: TavernSettings
 }
 
-export type TavernApiProvider = 'deepseek' | 'openai-compatible'
+export type TavernApiProvider =
+  | 'azure-openai'
+  | 'chutes'
+  | 'claude'
+  | 'cloudflare-workers-ai'
+  | 'cohere'
+  | 'deepseek'
+  | 'electron-hub'
+  | 'fireworks'
+  | 'groq'
+  | 'google-ai-studio'
+  | 'google-vertex-ai'
+  | 'mistral'
+  | 'minimax'
+  | 'moonshot'
+  | 'nanogpt'
+  | 'openai'
+  | 'openrouter'
+  | 'perplexity'
+  | 'pollinations'
+  | 'siliconflow'
+  | 'xai'
+  | 'zai'
+  | 'openai-compatible'
+
+export type TavernApiProtocol =
+  | 'openai-chat'
+  | 'azure-openai'
+  | 'anthropic-messages'
+  | 'gemini'
+  | 'vertex-gemini'
+  | 'cohere-v2'
+  | 'cloudflare-workers-ai'
+
+export type TavernApiAuth = 'bearer' | 'api-key' | 'x-api-key' | 'google-api-key'
+export type TavernProviderOptionKey = 'accountId' | 'projectId' | 'location'
 
 export interface TavernApiConfig {
   provider: TavernApiProvider
@@ -234,12 +269,12 @@ export interface TavernApiConfig {
   temperature: number
   maxTokens: number
   rememberKey: boolean
+  providerOptions: Partial<Record<TavernProviderOptionKey, string>>
   persistedApiKey?: string
 }
 
 export interface TavernSettings {
   key: 'mistvale-settings'
-  adapterMode: 'local' | 'remote'
   api: TavernApiConfig
   activePresetId: string | null
   activeLorebookIds: string[]
@@ -252,7 +287,7 @@ export interface TavernSettings {
   updatedAt: number
 }
 
-export const DEFAULT_FORMAT_PROMPT = `本地剧情引擎使用以下六段式酒馆结构：
+export const DEFAULT_FORMAT_PROMPT = `模型必须使用以下六段式酒馆结构：
 <thinking>内部状态推演</thinking>
 <maintext>本回合剧情正文</maintext>
 <option>可选择的行动，每行一项</option>
@@ -278,7 +313,7 @@ export const DEFAULT_PROMPT_ORDER = [
 export function createDefaultPreset(): Omit<ChatPreset, 'id' | 'createdAt' | 'updatedAt'> {
   return {
     name: '雾灯叙事预设',
-    description: '适配本地剧情引擎的 SillyTavern 风格提示词结构；当前不会发送到任何模型。',
+    description: '面向模型 API 的 SillyTavern 风格中文叙事结构，组合角色卡、世界书与游戏变量。',
     settings: {
       max_length: 4096,
       main: '以精细、克制的中文描写推进 {{char}} 与 {{user}} 在雾灯谷的互动。',

@@ -1,5 +1,12 @@
-import { normalizeApiBaseUrl } from './api-config'
-import type { TavernApiAdapter, TavernApiConfig, TavernPreparedRequest, TavernStreamEvent } from './types'
+import { getTavernProvider } from './provider-registry'
+import {
+  buildProviderModelsRequest,
+  buildProviderRequest,
+  extractProviderModels,
+  extractProviderSseDelta,
+  extractProviderText,
+} from './protocol-adapters'
+import type { TavernApiAdapter, TavernApiConfig, TavernApiProtocol, TavernPreparedRequest, TavernStreamEvent } from './types'
 
 export type TavernApiErrorCode =
   | 'TAVERN_API_KEY_MISSING'
@@ -21,13 +28,6 @@ export class TavernApiRequestError extends Error {
 }
 
 type TavernFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
-
-interface ChatCompletionChunk {
-  choices?: Array<{
-    delta?: { content?: string | null }
-    message?: { content?: string | null }
-  }>
-}
 
 export class TavernApiDisabledError extends Error {
   readonly code = 'TAVERN_API_DISABLED' as const
@@ -51,17 +51,6 @@ export function createDisabledTavernApi(): TavernApiAdapter {
     async *stream() {
       throw new TavernApiDisabledError()
     },
-  }
-}
-
-function endpoint(baseUrl: string, path: string): string {
-  return `${normalizeApiBaseUrl(baseUrl)}${path}`
-}
-
-function requestHeaders(apiKey: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
   }
 }
 
@@ -117,13 +106,7 @@ async function fetchProvider(fetchImpl: TavernFetch, input: string, init: Reques
   }
 }
 
-function extractContent(payload: ChatCompletionChunk): string {
-  return payload.choices?.[0]?.delta?.content
-    ?? payload.choices?.[0]?.message?.content
-    ?? ''
-}
-
-async function* streamSse(response: Response): AsyncGenerator<TavernStreamEvent> {
+async function* streamSse(response: Response, protocol: TavernApiProtocol): AsyncGenerator<TavernStreamEvent> {
   if (!response.body) {
     throw new TavernApiRequestError('模型服务没有返回可读取的响应内容。', 'TAVERN_API_INVALID_RESPONSE')
   }
@@ -146,7 +129,7 @@ async function* streamSse(response: Response): AsyncGenerator<TavernStreamEvent>
         break
       }
       try {
-        const content = extractContent(JSON.parse(data) as ChatCompletionChunk)
+        const content = extractProviderSseDelta(protocol, JSON.parse(data))
         if (content) yield { type: 'delta', text: content }
       } catch {
         throw new TavernApiRequestError('模型服务返回了无法解析的流式数据。', 'TAVERN_API_INVALID_RESPONSE')
@@ -157,18 +140,18 @@ async function* streamSse(response: Response): AsyncGenerator<TavernStreamEvent>
   yield { type: 'done' }
 }
 
-async function* streamResponse(response: Response): AsyncGenerator<TavernStreamEvent> {
+async function* streamResponse(response: Response, protocol: TavernApiProtocol): AsyncGenerator<TavernStreamEvent> {
   if (response.headers.get('content-type')?.toLowerCase().includes('text/event-stream')) {
-    yield* streamSse(response)
+    yield* streamSse(response, protocol)
     return
   }
-  let payload: ChatCompletionChunk
+  let payload: unknown
   try {
-    payload = await response.json() as ChatCompletionChunk
+    payload = await response.json()
   } catch {
     throw new TavernApiRequestError('模型服务返回的内容不是有效 JSON。', 'TAVERN_API_INVALID_RESPONSE')
   }
-  const content = extractContent(payload)
+  const content = extractProviderText(protocol, payload)
   if (!content) throw new TavernApiRequestError('模型响应中没有可显示的正文。', 'TAVERN_API_INVALID_RESPONSE')
   yield { type: 'delta', text: content }
   yield { type: 'done' }
@@ -179,9 +162,10 @@ export function createRemoteTavernApi(
   apiKey: string,
   fetchImpl: TavernFetch = globalThis.fetch.bind(globalThis),
 ): TavernApiAdapter {
+  const provider = getTavernProvider(config.provider)
   return {
     mode: 'remote',
-    label: `${config.provider === 'deepseek' ? 'DeepSeek' : '兼容接口'} · ${config.model}`,
+    label: `${provider.label} · ${config.model}`,
     prepare: (request) => ({
       id: crypto.randomUUID(),
       request,
@@ -190,20 +174,10 @@ export function createRemoteTavernApi(
     }),
     async *stream(prepared: TavernPreparedRequest, signal?: AbortSignal) {
       const key = requireApiKey(apiKey)
-      const response = await fetchProvider(fetchImpl, endpoint(config.baseUrl, '/chat/completions'), {
-        method: 'POST',
-        headers: requestHeaders(key),
-        body: JSON.stringify({
-          model: config.model,
-          messages: prepared.request.messages,
-          temperature: config.temperature,
-          max_tokens: config.maxTokens,
-          stream: true,
-        }),
-        signal,
-      })
+      const built = buildProviderRequest(config, key, prepared.request, true)
+      const response = await fetchProvider(fetchImpl, built.url, { ...built.init, signal })
       if (!response.ok) throw await providerError(response)
-      yield* streamResponse(response)
+      yield* streamResponse(response, provider.protocol)
     },
   }
 }
@@ -214,15 +188,22 @@ export async function testTavernApiConnection(
   fetchImpl: TavernFetch = globalThis.fetch.bind(globalThis),
 ): Promise<{ models: string[] }> {
   const key = requireApiKey(apiKey)
-  const response = await fetchProvider(fetchImpl, endpoint(config.baseUrl, '/models'), {
-    method: 'GET',
-    headers: requestHeaders(key),
-  })
+  const modelsRequest = buildProviderModelsRequest(config, key)
+  if (!modelsRequest) {
+    const check = buildProviderRequest(config, key, { task: 'story', messages: [{ role: 'user', content: '请只回复“连接成功”。' }] }, false)
+    const response = await fetchProvider(fetchImpl, check.url, check.init)
+    if (!response.ok) throw await providerError(response)
+    let payload: unknown
+    try { payload = await response.json() } catch { throw new TavernApiRequestError('连接成功，但响应格式无法识别。', 'TAVERN_API_INVALID_RESPONSE') }
+    if (!extractProviderText(getTavernProvider(config.provider).protocol, payload)) {
+      throw new TavernApiRequestError('连接成功，但模型没有返回可识别的正文。', 'TAVERN_API_INVALID_RESPONSE')
+    }
+    return { models: [] }
+  }
+  const response = await fetchProvider(fetchImpl, modelsRequest.url, modelsRequest.init)
   if (!response.ok) throw await providerError(response)
   try {
-    const payload = await response.json() as { data?: Array<{ id?: string }> }
-    const models = (payload.data ?? []).map((model) => model.id?.trim()).filter((id): id is string => Boolean(id))
-    return { models }
+    return { models: extractProviderModels(await response.json()) }
   } catch {
     throw new TavernApiRequestError('连接成功，但模型列表格式无法识别。', 'TAVERN_API_INVALID_RESPONSE')
   }

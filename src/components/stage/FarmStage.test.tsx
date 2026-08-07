@@ -35,4 +35,35 @@ describe('农场主舞台', () => {
 
     expect(screen.getByRole('button', { name: '地块 1-2，空地' })).toBeVisible()
   })
+
+  it('点击空地后展示当季持有种子并可立即播种', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider initialState={{
+      ...initialGameState,
+      rules: { ...initialGameState.rules, cropGrowthMultiplier: 2 },
+    }}><FarmStage /></GameProvider>)
+
+    await user.click(screen.getByRole('button', { name: '地块 1-1，空地' }))
+    const dialog = screen.getByRole('dialog', { name: '地块详情' })
+    expect(within(dialog).getByRole('button', { name: '播种月铃萝卜，持有 8 包' })).toBeEnabled()
+    expect(within(dialog).getByRole('button', { name: '播种雾荚豆，持有 4 包' })).toBeEnabled()
+
+    await user.click(within(dialog).getByRole('button', { name: '播种月铃萝卜，持有 8 包' }))
+    expect(screen.getByRole('button', { name: '地块 1-1，月铃萝卜，1日4小时后成熟' })).toBeVisible()
+    expect(within(dialog).getByText('1日4小时后成熟')).toBeVisible()
+  })
+
+  it('保留背包中的异季种子并明确显示为不可播种', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider initialState={{
+      ...initialGameState,
+      inventory: { ...initialGameState.inventory, 'sun-wheat-seed': 2 },
+    }}><FarmStage /></GameProvider>)
+
+    await user.click(screen.getByRole('button', { name: '地块 1-1，空地' }))
+    const dialog = screen.getByRole('dialog', { name: '地块详情' })
+    const autumnSeed = within(dialog).getByRole('button', { name: '播种夕照麦，持有 2 包，秋季可用' })
+    expect(autumnSeed).toBeDisabled()
+    expect(within(autumnSeed).getByText('秋季可用')).toBeVisible()
+  })
 })

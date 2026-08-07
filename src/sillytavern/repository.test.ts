@@ -27,8 +27,9 @@ describe('雾灯谷酒馆仓储', () => {
     await repository.initialize()
     expect((await repository.getCharacter(edited.id))?.personality).toBe('玩家自定义性格')
     expect(await repository.listLorebooks()).toHaveLength(2)
-    expect((await repository.getSettings()).adapterMode).toBe('local')
-    expect((await repository.getSettings()).api.model).toBe('deepseek-v4-flash')
+    const settings = await repository.getSettings()
+    expect(settings).not.toHaveProperty('adapterMode')
+    expect(settings.api.model).toBe('deepseek-v4-flash')
   })
 
   it('读取旧版设置时补全 API 配置且不会凭空保存密钥', async () => {
@@ -40,7 +41,7 @@ describe('雾灯谷酒馆仓储', () => {
 
     const migrated = await repository.getSettings()
 
-    expect(migrated.adapterMode).toBe('local')
+    expect(migrated).not.toHaveProperty('adapterMode')
     expect(migrated.api).toMatchObject({ provider: 'deepseek', model: 'deepseek-v4-flash' })
     expect(migrated.api.persistedApiKey).toBeUndefined()
   })

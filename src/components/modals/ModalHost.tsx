@@ -13,6 +13,7 @@ import { MineModal } from './MineModal'
 import { BattleModal } from './BattleModal'
 import { FishingModal } from './FishingModal'
 import { TavernHubModal } from '../SillyTavern/TavernHubModal'
+import { SettingsModal } from './SettingsModal'
 
 const unmanaged = new Set<ModalType>([null, 'plot', 'npc', 'dialogue'])
 const titles: Partial<Record<Exclude<ModalType, null>, string>> = {
@@ -21,7 +22,6 @@ const titles: Partial<Record<Exclude<ModalType, null>, string>> = {
 
 function FutureFeature({ type }: { type: Exclude<ModalType, null> }) {
   const copy: Partial<Record<Exclude<ModalType, null>, { title: string; text: string }>> = {
-    settings: { title: '体验与辅助设置', text: '可调整文字速度、场景动效、像素滤镜、界面音量与高对比度。当前原型会自动遵循系统的减少动态效果偏好。' },
     character: { title: '五维成长总览', text: '生命、物理攻击、魔力与魔法伤害将分别随战斗和魔法等级成长。' },
     library: { title: '五行术式书架', text: '金、木、水、火、土术式已按魔法等级编目，可学习的法术会显示精力代价。' },
     mine: { title: '层级与电梯记录', text: '普通层存在怪物与矿脉，每逢五层为安全电梯层。' },
@@ -35,6 +35,7 @@ function FutureFeature({ type }: { type: Exclude<ModalType, null> }) {
 function contentFor(type: Exclude<ModalType, null>, close: () => void): ReactNode {
   if (type === 'tavern') return <TavernHubModal onClose={close} />
   if (type === 'inventory') return <InventoryModal />
+  if (type === 'settings') return <SettingsModal />
   if (type === 'journal') return <QuestModal journal />
   if (type === 'quest-board') return <QuestModal />
   if (type === 'trade') return <TradeModal />

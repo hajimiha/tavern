@@ -3,7 +3,7 @@ import { createMistvaleDefaults } from './defaults'
 import { getTavernApiPreset, normalizeTavernSettings, validateTavernApiConfig } from './api-config'
 
 describe('酒馆 API 配置', () => {
-  it('将旧版禁用设置迁移为完整的本地模式配置', () => {
+  it('将旧版禁用或本地设置迁移为强制在线模型配置', () => {
     const defaults = createMistvaleDefaults().settings
     const legacy = {
       ...defaults,
@@ -13,7 +13,7 @@ describe('酒馆 API 配置', () => {
 
     const normalized = normalizeTavernSettings(legacy)
 
-    expect(normalized.adapterMode).toBe('local')
+    expect(normalized).not.toHaveProperty('adapterMode')
     expect(normalized.api).toMatchObject({
       provider: 'deepseek',
       baseUrl: 'https://api.deepseek.com',
@@ -24,7 +24,7 @@ describe('酒馆 API 配置', () => {
     })
   })
 
-  it('提供 DeepSeek 与自定义兼容服务预设', () => {
+  it('提供 DeepSeek、Claude 与自定义兼容服务预设', () => {
     expect(getTavernApiPreset('deepseek')).toMatchObject({
       baseUrl: 'https://api.deepseek.com',
       model: 'deepseek-v4-flash',
@@ -32,6 +32,10 @@ describe('酒馆 API 配置', () => {
     expect(getTavernApiPreset('openai-compatible')).toMatchObject({
       baseUrl: '',
       model: '',
+    })
+    expect(getTavernApiPreset('claude')).toMatchObject({
+      baseUrl: 'https://api.anthropic.com',
+      model: expect.any(String),
     })
   })
 
@@ -43,6 +47,7 @@ describe('酒馆 API 配置', () => {
       temperature: 3,
       maxTokens: 20,
       rememberKey: false,
+      providerOptions: {},
     })
 
     expect(errors).toMatchObject({

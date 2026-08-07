@@ -35,6 +35,45 @@ describe('NPC 关系与灵犀对话', () => {
 
     await user.click(screen.getByRole('button', { name: '与洛岚交谈' }))
     expect(screen.getByRole('dialog', { name: '与洛岚的酒馆会话' })).toBeVisible()
-    expect(screen.getByText(/本地叙事 · 不发送网络请求/)).toBeVisible()
+    expect(screen.getByText(/消息将发送到已配置的模型服务/)).toBeVisible()
+    expect(screen.queryByText(/本地叙事|不发送网络请求/)).not.toBeInTheDocument()
+  })
+
+  it('自由叙事模式允许零精力进入交谈', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-npc-free-${crypto.randomUUID()}`)
+    render(
+      <GameProvider initialState={{
+        ...initialGameState,
+        location: 'mayor-home',
+        energy: 0,
+        rules: { ...initialGameState.rules, energyCostMode: 'free' },
+      }}>
+        <TavernProvider repository={createTavernRepository(database)}><LocationStage /></TavernProvider>
+      </GameProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: '与村长洛岚互动' }))
+    expect(screen.getAllByText('消耗 0 精力')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: '与洛岚交谈' }))
+    expect(screen.getByRole('dialog', { name: '与洛岚的酒馆会话' })).toBeVisible()
+  })
+
+  it('生存压力模式在仅剩一点精力时阻止交谈', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-npc-double-${crypto.randomUUID()}`)
+    render(
+      <GameProvider initialState={{
+        ...initialGameState,
+        location: 'mayor-home',
+        energy: 1,
+        rules: { ...initialGameState.rules, energyCostMode: 'double' },
+      }}>
+        <TavernProvider repository={createTavernRepository(database)}><LocationStage /></TavernProvider>
+      </GameProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: '与村长洛岚互动' }))
+    expect(screen.getAllByText('消耗 2 精力')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: '与洛岚交谈' }))
+    expect(screen.queryByRole('dialog', { name: '与洛岚的酒馆会话' })).not.toBeInTheDocument()
   })
 })

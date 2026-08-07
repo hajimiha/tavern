@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { npcs } from '../../game/data'
-import { GameProvider } from '../../game/GameContext'
+import { GameProvider, useGame } from '../../game/GameContext'
 import { initialGameState } from '../../game/reducer'
 import { createTavernDatabase, type MistvaleTavernDatabase } from '../../sillytavern/database'
 import { clearSessionApiKey, setSessionApiKey } from '../../sillytavern/api-credentials'
@@ -13,6 +13,11 @@ import { TavernProvider } from '../../tavern/TavernContext'
 import { TavernDialogue } from './TavernDialogue'
 
 let database: MistvaleTavernDatabase | undefined
+
+function GameStateProbe() {
+  const { state } = useGame()
+  return <output data-testid="game-state-probe">精力 {state.energy} · 好感 {state.relationships.loran.affinity}</output>
+}
 
 afterEach(async () => {
   clearSessionApiKey()
@@ -24,7 +29,7 @@ afterEach(async () => {
 })
 
 describe('NPC 酒馆会话', () => {
-  it('展示角色卡、历史入口、本地状态和结构化行动', async () => {
+  it('缺少 API 密钥时预先禁用生成并引导玩家打开接口设置', async () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-dialogue-${crypto.randomUUID()}`)
@@ -36,20 +41,24 @@ describe('NPC 酒馆会话', () => {
       <GameProvider initialState={{ ...initialGameState, location: 'mayor-home' }}>
         <TavernProvider repository={repository}>
           <TavernDialogue npc={loran} />
+          <GameStateProbe />
         </TavernProvider>
       </GameProvider>,
     )
 
     expect(await screen.findByRole('heading', { name: '与洛岚的酒馆会话' })).toBeVisible()
     expect(screen.getByRole('button', { name: '查看会话历史' })).toBeVisible()
-    expect(screen.getByText('本地叙事 · 不发送网络请求')).toBeVisible()
+    expect(await screen.findByText(/DeepSeek/)).toBeVisible()
+    expect(screen.queryByText(/本地叙事|LOCAL TAVERN|只在本机生成/)).not.toBeInTheDocument()
     const action = await screen.findByRole('button', { name: /选择行动：询问今日委托/ })
-    await waitFor(() => expect(action).toBeEnabled())
+    await waitFor(() => expect(action).toBeDisabled())
     expect(saveSessionSpy).toHaveBeenCalledTimes(1)
-    await user.click(action)
-    await waitFor(() => expect(saveSessionSpy).toHaveBeenCalledTimes(2))
-    await waitFor(async () => expect((await repository.listSessions())[0]?.messages).toHaveLength(3))
-    expect(await screen.findByText(/村庄会记得/)).toBeVisible()
+    expect(await screen.findByRole('alert')).toHaveTextContent('尚未填写 API 密钥')
+    expect(screen.getByRole('button', { name: '打开接口设置' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '送出话语' })).toBeDisabled()
+    expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 5 · 好感 0')
+    expect(saveSessionSpy).toHaveBeenCalledTimes(1)
+    await waitFor(async () => expect((await repository.listSessions())[0]?.messages).toHaveLength(1))
   })
 
   it('远程模式使用配置的模型生成并保存 NPC 互动文字', async () => {
@@ -68,8 +77,6 @@ describe('NPC 酒馆会话', () => {
     database = createTavernDatabase(`mistvale-remote-dialogue-${crypto.randomUUID()}`)
     const repository = createTavernRepository(database)
     await repository.initialize()
-    const settings = await repository.getSettings()
-    await repository.saveSettings({ ...settings, adapterMode: 'remote' })
     const loran = npcs.find((npc) => npc.id === 'loran')!
     const user = userEvent.setup()
 
@@ -77,6 +84,7 @@ describe('NPC 酒馆会话', () => {
       <GameProvider initialState={{ ...initialGameState, location: 'mayor-home' }}>
         <TavernProvider repository={repository}>
           <TavernDialogue npc={loran} />
+          <GameStateProbe />
         </TavernProvider>
       </GameProvider>,
     )
@@ -91,5 +99,35 @@ describe('NPC 酒馆会话', () => {
       content: '洛岚翻开空白委托簿，说今天先熟悉村庄就好。',
       apiUsed: 'remote',
     })
+    expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 4 · 好感 6')
+  })
+
+  it('远程请求失败时保留玩家输入且不结算精力和好感', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('拒绝访问', { status: 401 })))
+    setSessionApiKey('session-secret')
+    database = createTavernDatabase(`mistvale-failed-dialogue-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const loran = npcs.find((npc) => npc.id === 'loran')!
+    const user = userEvent.setup()
+
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'mayor-home' }}>
+        <TavernProvider repository={repository}>
+          <TavernDialogue npc={loran} />
+          <GameStateProbe />
+        </TavernProvider>
+      </GameProvider>,
+    )
+
+    const input = await screen.findByLabelText('自由输入')
+    await waitFor(() => expect(input).toBeEnabled())
+    await user.type(input, '今天有什么委托？')
+    await user.click(screen.getByRole('button', { name: '送出话语' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/鉴权失败|密钥.*有效|权限/)
+    expect(input).toHaveValue('今天有什么委托？')
+    expect(screen.getByTestId('game-state-probe')).toHaveTextContent('精力 5 · 好感 0')
   })
 })

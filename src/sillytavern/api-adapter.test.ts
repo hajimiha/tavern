@@ -78,6 +78,30 @@ describe('本地优先酒馆 API 适配器', () => {
     expect(events).toEqual([{ type: 'delta', text: '普通响应正文' }, { type: 'done' }])
   })
 
+  it('按 Claude 协议解析命名 SSE 事件', async () => {
+    const config = {
+      ...createMistvaleDefaults().settings.api,
+      provider: 'claude' as const,
+      baseUrl: 'https://api.anthropic.com',
+      model: 'claude-opus-4-8',
+    }
+    const fetchMock = vi.fn().mockResolvedValue(new Response([
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"远程正文"}}',
+      '',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+      '',
+    ].join('\n'), { headers: { 'content-type': 'text/event-stream' } }))
+    const api = createRemoteTavernApi(config, 'secret-key', fetchMock)
+
+    expect(await collect(api.stream(api.prepare({ task: 'story', messages: [{ role: 'user', content: '继续' }] })))).toEqual([
+      { type: 'delta', text: '远程正文' },
+      { type: 'done' },
+    ])
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.anthropic.com/v1/messages')
+  })
+
   it('通过模型列表端点测试连接并返回可用模型', async () => {
     const config = createMistvaleDefaults().settings.api
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({

@@ -10,6 +10,18 @@ function LocationObserver() {
   return <output aria-label="当前地点标识">{state.location}</output>
 }
 
+class TestPointerEvent extends MouseEvent {
+  pointerId: number
+  constructor(type: string, init: MouseEventInit & { pointerId: number }) {
+    super(type, init)
+    this.pointerId = init.pointerId
+  }
+}
+
+function pointerEvent(type: string, init: MouseEventInit & { pointerId: number }) {
+  return new TestPointerEvent(type, { bubbles: true, ...init })
+}
+
 describe('连续像素村庄地图', () => {
   afterEach(() => vi.useRealTimers())
 
@@ -62,5 +74,31 @@ describe('连续像素村庄地图', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '前往渔家' }))
     expect(screen.getByRole('dialog', { name: '前往渔家' })).toBeVisible()
+  })
+
+  it('只有移动跨过阈值后才捕获指针并进入拖动态', () => {
+    render(<GameProvider><VillageMap /></GameProvider>)
+    const viewport = screen.getByRole('application', { name: '可拖动的雾灯谷地图' })
+    const setPointerCapture = vi.fn()
+    const releasePointerCapture = vi.fn()
+    Object.defineProperties(viewport, {
+      setPointerCapture: { configurable: true, value: setPointerCapture },
+      hasPointerCapture: { configurable: true, value: vi.fn(() => true) },
+      releasePointerCapture: { configurable: true, value: releasePointerCapture },
+    })
+
+    fireEvent(viewport, pointerEvent('pointerdown', { pointerId: 11, button: 0, clientX: 100, clientY: 100 }))
+    expect(setPointerCapture).not.toHaveBeenCalled()
+    expect(viewport).not.toHaveClass('is-dragging')
+
+    fireEvent(viewport, pointerEvent('pointermove', { pointerId: 11, clientX: 103, clientY: 103 }))
+    expect(setPointerCapture).not.toHaveBeenCalled()
+    fireEvent(viewport, pointerEvent('pointermove', { pointerId: 11, clientX: 112, clientY: 108 }))
+    expect(setPointerCapture).toHaveBeenCalledWith(11)
+    expect(viewport).toHaveClass('is-dragging')
+
+    fireEvent(viewport, pointerEvent('pointerup', { pointerId: 11, clientX: 112, clientY: 108 }))
+    expect(releasePointerCapture).toHaveBeenCalledWith(11)
+    expect(viewport).not.toHaveClass('is-dragging')
   })
 })

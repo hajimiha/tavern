@@ -19,6 +19,19 @@ export type LocationId =
 export type AffinityStage = 'stranger' | 'acquainted' | 'trusted' | 'intimate' | 'bonded'
 export type NpcAction = 'chat' | 'gift' | 'trade' | 'quest' | 'profile'
 export type SkillId = 'fishing' | 'farming' | 'mining' | 'combat' | 'magic'
+export type EnergyCostMode = 'free' | 'normal' | 'double'
+
+export interface GameRuleSettings {
+  experienceMultiplier: number
+  affinityMultiplier: number
+  dropMultiplier: number
+  moneyMultiplier: number
+  cropGrowthMultiplier: number
+  playerDamageMultiplier: number
+  enemyDamageMultiplier: number
+  recoveryMultiplier: number
+  energyCostMode: EnergyCostMode
+}
 
 export interface SkillProgress {
   level: number
@@ -164,6 +177,7 @@ export interface GameState {
   energy: number
   maxEnergy: number
   money: number
+  rules: GameRuleSettings
   skills: Record<SkillId, SkillProgress>
   stats: { health: number; maxHealth: number; attack: number; mana: number; maxMana: number; magicDamage: number }
   inventory: Record<string, number>
@@ -190,6 +204,7 @@ export type GameAction =
   | { type: 'OPEN_MODAL'; modal: Exclude<ModalType, null>; npcId?: string; plotId?: string }
   | { type: 'CLOSE_MODAL' }
   | { type: 'TRAVEL_TO_LOCATION'; location: LocationId; minutes: number }
+  | { type: 'PLANT_PLOT'; plotId: string; seedId: string }
   | { type: 'WATER_PLOT'; plotId: string }
   | { type: 'FERTILIZE_PLOT'; plotId: string }
   | { type: 'HARVEST_PLOT'; plotId: string }
@@ -213,5 +228,7 @@ export type GameAction =
   | { type: 'REFINE_ORE' }
   | { type: 'BUY_PERMANENT_UPGRADE'; upgrade: 'energy' | 'mana'; price: number }
   | { type: 'PLAYER_DEFEATED' }
+  | { type: 'UPDATE_GAME_RULES'; rules: Partial<GameRuleSettings> }
+  | { type: 'RESET_GAME_RULES' }
 
 export interface GameProviderProps { children: ReactNode; initialState?: GameState }

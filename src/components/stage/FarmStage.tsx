@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react'
 import farmDuskImage from '../../assets/pixel/farm-dusk.webp'
-import { crops } from '../../game/data'
+import { crops, shopItems } from '../../game/data'
 import { useGame } from '../../game/GameContext'
+import { scaleGrowthHours, scaleReward } from '../../game/rules'
 import type { Plot } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
 
@@ -29,6 +30,13 @@ export function FarmStage() {
   const selectedCrop = crops.find((crop) => crop.id === selected?.cropId)
   const matureCount = state.plots.filter((plot) => plot.ready).length
   const fertilizerCount = state.inventory['moss-fertilizer'] ?? 0
+  const seedChoices = shopItems.flatMap((seed) => {
+    if (seed.category !== 'seed' || (state.inventory[seed.id] ?? 0) < 1) return []
+    const crop = crops.find((item) => `${item.id}-seed` === seed.id)
+    const available = seed.season === state.season && crop?.season === state.season
+    return crop ? [{ seed, crop, count: state.inventory[seed.id], available }] : []
+  })
+  const selectedGrowthHours = selectedCrop ? scaleGrowthHours(selectedCrop.growthHours, state.rules.cropGrowthMultiplier) : 0
   const close = () => dispatch({ type: 'CLOSE_MODAL' })
 
   const harvest = () => {
@@ -86,13 +94,29 @@ export function FarmStage() {
             <span className={`crop-emblem ${selected.ready ? 'is-ready' : ''}`} style={{ '--crop-color': selectedCrop?.color ?? '#74543b' } as CSSProperties} aria-hidden="true"><i /></span>
             <div><strong>{selectedCrop?.name ?? '休耕空地'}</strong><p>{selectedCrop?.description ?? '土壤松软，适合播下本季种子。'}</p></div>
           </div>
-          {selectedCrop && <div className="growth-meter"><span style={{ width: `${selected.ready ? 100 : Math.max(8, 100 - ((selected.remainingHours ?? 0) / selectedCrop.growthHours) * 100)}%` }} /><small>{selected.ready ? '已经成熟' : formatRemaining(selected.remainingHours ?? 0)}</small></div>}
-          <div className="plot-actions">
-            <button id={`plot-water-${selected.id}`} type="button" aria-label={`给地块 ${selected.row}-${selected.column} 浇水`} disabled={!selectedCrop || selected.ready || selected.watered} onClick={() => dispatch({ type: 'WATER_PLOT', plotId: selected.id })}><span>浇水</span><small>{selected.watered ? '今日已浇水' : '0 精力'}</small></button>
-            <button id={`plot-fertilize-${selected.id}`} type="button" aria-label={`给地块 ${selected.row}-${selected.column} 施肥`} disabled={!selectedCrop || selected.ready || selected.fertilized || fertilizerCount < 1} onClick={() => dispatch({ type: 'FERTILIZE_PLOT', plotId: selected.id })}><span>施用苔肥</span><small>{selected.fertilized ? '已经施肥' : `1 份 · 持有 ${fertilizerCount}`}</small></button>
-            <button id={`plot-harvest-${selected.id}`} className="harvest-action" type="button" aria-label={selectedCrop ? `收获地块 ${selected.row}-${selected.column} 的${selectedCrop.name}` : '当前地块没有可收获作物'} disabled={!selectedCrop || !selected.ready} onClick={harvest}><span>收获</span><small>{selected.ready ? '预计 3 份' : '尚未成熟'}</small></button>
-          </div>
-          {!selectedCrop && <p className="plot-inline-note">播种功能已纳入杂货店的种子流程；购买种子后可在此地块选择种植。</p>}
+          {selectedCrop && <>
+            <div className="growth-meter"><span style={{ width: `${selected.ready ? 100 : Math.max(8, 100 - ((selected.remainingHours ?? 0) / selectedGrowthHours) * 100)}%` }} /><small>{selected.ready ? '已经成熟' : formatRemaining(selected.remainingHours ?? 0)}</small></div>
+            <div className="plot-actions">
+              <button id={`plot-water-${selected.id}`} type="button" aria-label={`给地块 ${selected.row}-${selected.column} 浇水`} disabled={selected.ready || selected.watered} onClick={() => dispatch({ type: 'WATER_PLOT', plotId: selected.id })}><span>浇水</span><small>{selected.watered ? '今日已浇水' : '0 精力'}</small></button>
+              <button id={`plot-fertilize-${selected.id}`} type="button" aria-label={`给地块 ${selected.row}-${selected.column} 施肥`} disabled={selected.ready || selected.fertilized || fertilizerCount < 1} onClick={() => dispatch({ type: 'FERTILIZE_PLOT', plotId: selected.id })}><span>施用苔肥</span><small>{selected.fertilized ? '已经施肥' : `1 份 · 持有 ${fertilizerCount}`}</small></button>
+              <button id={`plot-harvest-${selected.id}`} className="harvest-action" type="button" aria-label={`收获地块 ${selected.row}-${selected.column} 的${selectedCrop.name}`} disabled={!selected.ready} onClick={harvest}><span>收获</span><small>{selected.ready ? `预计 ${scaleReward(3, state.rules.dropMultiplier)} 份` : '尚未成熟'}</small></button>
+            </div>
+          </>}
+          {!selectedCrop && <section className="seed-picker" aria-labelledby={`seed-picker-title-${selected.id}`}>
+            <header><div><span>SEED SATCHEL</span><h3 id={`seed-picker-title-${selected.id}`}>选择持有种子</h3></div><small>{state.season}季 · 生长倍率 ×{state.rules.cropGrowthMultiplier.toFixed(2)}</small></header>
+            {seedChoices.length > 0 ? <div className="seed-choice-list">{seedChoices.map(({ seed, crop, count, available }) => <button
+              id={`plot-plant-${selected.id}-${seed.id}`}
+              key={seed.id}
+              type="button"
+              aria-label={`播种${crop.name}，持有 ${count} 包${available ? '' : `，${crop.season}季可用`}`}
+              disabled={!available}
+              onClick={() => dispatch({ type: 'PLANT_PLOT', plotId: selected.id, seedId: seed.id })}
+            >
+              <span className="seed-choice-mark" style={{ '--crop-color': crop.color } as CSSProperties} aria-hidden="true"><i /></span>
+              <span><strong>{crop.name}</strong><small>{available ? formatRemaining(scaleGrowthHours(crop.growthHours, state.rules.cropGrowthMultiplier)) : `${crop.season}季可用`}</small></span>
+              <b>持有 {count}</b>
+            </button>)}</div> : <p className="plot-inline-note">背包里没有适合{state.season}季的种子，可前往杂货店补充。</p>}
+          </section>}
         </section>
       )}
     </section>

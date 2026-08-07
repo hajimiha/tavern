@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { gameReducer, initialGameState } from './reducer'
+import { DEFAULT_GAME_RULES } from './rules'
 
 describe('游戏状态变更', () => {
   it('以刚抵达小镇的新手数据开始游戏', () => {
@@ -49,5 +50,113 @@ describe('游戏状态变更', () => {
     expect(next.energy).toBe(0)
     expect(next.toasts.at(-1)?.message).toBe('精力不足，无法聊天')
     expect(next.toasts.at(-1)?.tone).toBe('warning')
+  })
+
+  it('更新与恢复规则时执行边界规范化', () => {
+    const changed = gameReducer(initialGameState, {
+      type: 'UPDATE_GAME_RULES',
+      rules: { experienceMultiplier: 2.12, affinityMultiplier: 9 },
+    })
+    expect(changed.rules.experienceMultiplier).toBe(2)
+    expect(changed.rules.affinityMultiplier).toBe(3)
+    expect(gameReducer(changed, { type: 'RESET_GAME_RULES' }).rules).toEqual(DEFAULT_GAME_RULES)
+  })
+
+  it('将经验、好感、掉落、金币与双倍精力规则应用到行动', () => {
+    const configured = gameReducer(initialGameState, {
+      type: 'UPDATE_GAME_RULES',
+      rules: {
+        experienceMultiplier: 2,
+        affinityMultiplier: 1.5,
+        dropMultiplier: 2,
+        moneyMultiplier: 1.5,
+        energyCostMode: 'double',
+      },
+    })
+    const chatted = gameReducer(configured, { type: 'CHAT_WITH_NPC', npcId: 'loran' })
+    expect(chatted.energy).toBe(3)
+    expect(chatted.relationships.loran.affinity).toBe(9)
+
+    const trained = gameReducer(configured, { type: 'TRAIN_COMBAT' })
+    expect(trained.skills.combat.experience).toBe(36)
+    expect(trained.energy).toBe(3)
+
+    const mined = gameReducer(configured, { type: 'MINE_ORE', floor: 5 })
+    expect(mined.inventory['copper-ore']).toBe(4)
+    expect(mined.inventory['iron-ore']).toBe(2)
+    expect(mined.skills.mining.experience).toBe(34)
+
+    const quest = configured.quests[0]
+    const submitted = gameReducer({
+      ...configured,
+      inventory: { ...configured.inventory, [quest.requiredItemId]: quest.requiredAmount },
+    }, { type: 'SUBMIT_QUEST', questId: quest.id })
+    expect(submitted.money).toBe(500 + Math.round(quest.rewardMoney * 1.5))
+    expect(submitted.relationships[quest.issuerId].affinity).toBe(Math.round(quest.rewardAffinity * 1.5))
+
+    const sold = gameReducer({ ...configured, inventory: { ...configured.inventory, stone: 3 } }, {
+      type: 'SELL_ITEM', itemId: 'stone', quantity: 1, total: 40,
+    })
+    expect(sold.money).toBe(560)
+  })
+
+  it('将玩家伤害、敌方伤害与恢复倍率应用到战斗和医院', () => {
+    const configured = gameReducer({
+      ...initialGameState,
+      energy: 0,
+      stats: { ...initialGameState.stats, health: 10 },
+      inventory: { ...initialGameState.inventory, 'energy-tonic': 1 },
+    }, {
+      type: 'UPDATE_GAME_RULES',
+      rules: { playerDamageMultiplier: 2, enemyDamageMultiplier: 0.5, recoveryMultiplier: 2 },
+    })
+    const battleState = gameReducer(configured, { type: 'START_BATTLE', floor: 1 })
+    const attacked = gameReducer(battleState, { type: 'BATTLE_ACTION', action: 'physical' })
+    expect(attacked.battle?.enemyHealth).toBe(9)
+    expect(attacked.stats.health).toBe(7)
+
+    const healed = gameReducer(battleState, { type: 'BATTLE_ACTION', action: 'item' })
+    expect(healed.stats.health).toBe(17)
+
+    const hospital = gameReducer(configured, { type: 'USE_HOSPITAL' })
+    expect(hospital.energy).toBe(4)
+  })
+
+  it('在空地播下当季种子并按生长倍率计算成熟时间', () => {
+    const configured = gameReducer(initialGameState, {
+      type: 'UPDATE_GAME_RULES', rules: { cropGrowthMultiplier: 2 },
+    })
+    const planted = gameReducer(configured, {
+      type: 'PLANT_PLOT', plotId: 'plot-1-1', seedId: 'moon-radish-seed',
+    })
+    expect(planted.inventory['moon-radish-seed']).toBe(7)
+    expect(planted.plots[0]).toMatchObject({
+      cropId: 'moon-radish', remainingHours: 28, watered: false, fertilized: false, ready: false,
+    })
+    expect(planted.plots[0].plantedAt).toBeTypeOf('number')
+  })
+
+  it('旅行经过的时间会推进作物成长并在倒计时归零时成熟', () => {
+    const growing = {
+      ...initialGameState,
+      plots: initialGameState.plots.map((plot) => plot.id === 'plot-1-1'
+        ? { ...plot, cropId: 'moon-radish', remainingHours: 1, ready: false }
+        : plot),
+    }
+    const halfway = gameReducer(growing, { type: 'TRAVEL_TO_LOCATION', location: 'general-store', minutes: 30 })
+    expect(halfway.plots[0]).toMatchObject({ remainingHours: 0.5, ready: false })
+
+    const mature = gameReducer(halfway, { type: 'TRAVEL_TO_LOCATION', location: 'farm', minutes: 30 })
+    expect(mature.plots[0]).toMatchObject({ remainingHours: 0, ready: true })
+  })
+
+  it('拒绝在已种地块、错季种子或无库存时播种并给出内部提示', () => {
+    const plantedPlotState = {
+      ...initialGameState,
+      plots: initialGameState.plots.map((plot) => plot.id === 'plot-1-1' ? { ...plot, cropId: 'moon-radish' } : plot),
+    }
+    expect(gameReducer(plantedPlotState, { type: 'PLANT_PLOT', plotId: 'plot-1-1', seedId: 'moon-radish-seed' }).inventory['moon-radish-seed']).toBe(8)
+    expect(gameReducer(initialGameState, { type: 'PLANT_PLOT', plotId: 'plot-1-1', seedId: 'sun-wheat-seed' }).toasts.at(-1)?.title).toBe('播种未完成')
+    expect(gameReducer({ ...initialGameState, inventory: {} }, { type: 'PLANT_PLOT', plotId: 'plot-1-1', seedId: 'moon-radish-seed' }).plots[0].cropId).toBeUndefined()
   })
 })

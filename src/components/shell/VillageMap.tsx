@@ -144,8 +144,6 @@ export function VillageMap() {
       origin: offset,
       moved: false,
     }
-    event.currentTarget.setPointerCapture?.(event.pointerId)
-    setIsDragging(true)
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -153,7 +151,11 @@ export function VillageMap() {
     if (!drag || drag.pointerId !== event.pointerId) return
     const deltaX = event.clientX - drag.startX
     const deltaY = event.clientY - drag.startY
-    if (!drag.moved && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) drag.moved = true
+    if (!drag.moved && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) {
+      drag.moved = true
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+      setIsDragging(true)
+    }
     if (drag.moved) scheduleOffset({ x: drag.origin.x + deltaX, y: drag.origin.y + deltaY })
   }
 
@@ -168,7 +170,9 @@ export function VillageMap() {
       }, 0)
     }
     dragRef.current = null
-    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+    }
     setIsDragging(false)
   }
 

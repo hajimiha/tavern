@@ -1,5 +1,14 @@
-import { createInitialPlots, npcs, quests, spells } from './data'
-import { canSpendEnergy, elementAdvantage } from './rules'
+import { createInitialPlots, crops, npcs, quests, shopItems, spells } from './data'
+import {
+  DEFAULT_GAME_RULES,
+  canSpendEnergy,
+  elementAdvantage,
+  getEnergyCost,
+  normalizeGameRules,
+  scaleDamage,
+  scaleGrowthHours,
+  scaleReward,
+} from './rules'
 import type { GameAction, GameState, Relationship, ToastMessage } from './types'
 
 let toastSequence = 0
@@ -26,6 +35,16 @@ function affinityStage(affinity: number): Relationship['stage'] {
   return 'stranger'
 }
 
+function advancePlots(state: GameState, elapsedMinutes: number): GameState['plots'] {
+  if (elapsedMinutes <= 0) return state.plots
+  const elapsedHours = elapsedMinutes / 60
+  return state.plots.map((plot) => {
+    if (!plot.cropId || plot.ready || plot.remainingHours === undefined) return plot
+    const remainingHours = Math.max(0, Number((plot.remainingHours - elapsedHours).toFixed(2)))
+    return { ...plot, remainingHours, ready: remainingHours === 0 }
+  })
+}
+
 export const initialGameState: GameState = {
   day: 1,
   season: '春',
@@ -36,6 +55,7 @@ export const initialGameState: GameState = {
   energy: 5,
   maxEnergy: 5,
   money: 500,
+  rules: { ...DEFAULT_GAME_RULES },
   skills: {
     fishing: { level: 1, experience: 0, nextLevel: 60 },
     farming: { level: 1, experience: 0, nextLevel: 60 },
@@ -63,8 +83,13 @@ export const initialGameState: GameState = {
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
+    case 'UPDATE_GAME_RULES':
+      return { ...state, rules: normalizeGameRules({ ...state.rules, ...action.rules }) }
+    case 'RESET_GAME_RULES':
+      return { ...state, rules: { ...DEFAULT_GAME_RULES } }
     case 'SPEND_ENERGY': {
-      const permission = canSpendEnergy(state, action.amount)
+      const cost = getEnergyCost(action.amount, state.rules.energyCostMode)
+      const permission = canSpendEnergy(state, cost)
       if (!permission.allowed) {
         return {
           ...state,
@@ -75,7 +100,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           })],
         }
       }
-      return { ...state, energy: state.energy - action.amount }
+      return { ...state, energy: state.energy - cost }
     }
     case 'ADD_TOAST':
       return { ...state, toasts: [...state.toasts, makeToast(action.toast)] }
@@ -86,7 +111,41 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'CLOSE_MODAL':
       return { ...state, activeModal: null, selectedNpcId: undefined, selectedPlotId: undefined }
     case 'TRAVEL_TO_LOCATION':
-      return { ...state, location: action.location, minutes: state.minutes + action.minutes }
+      return {
+        ...state,
+        location: action.location,
+        minutes: state.minutes + action.minutes,
+        plots: advancePlots(state, action.minutes),
+      }
+    case 'PLANT_PLOT': {
+      const plot = state.plots.find((item) => item.id === action.plotId)
+      const seed = shopItems.find((item) => item.id === action.seedId && item.category === 'seed')
+      const cropId = action.seedId.endsWith('-seed') ? action.seedId.slice(0, -5) : ''
+      const crop = crops.find((item) => item.id === cropId)
+      let message = ''
+      if (!plot || !seed || !crop) message = '这不是可以播种的有效种子。'
+      else if (plot.cropId) message = '该地块已经种有作物。'
+      else if (seed.season !== state.season || crop.season !== state.season) message = `这种作物不适合在${state.season}季播种。`
+      else if ((state.inventory[action.seedId] ?? 0) < 1) message = '背包里没有这包种子。'
+      if (message || !plot || !seed || !crop) {
+        return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '播种未完成', message })] }
+      }
+      const remainingHours = scaleGrowthHours(crop.growthHours, state.rules.cropGrowthMultiplier)
+      return {
+        ...state,
+        inventory: { ...state.inventory, [action.seedId]: state.inventory[action.seedId] - 1 },
+        plots: state.plots.map((item) => item.id === plot.id ? {
+          ...item,
+          cropId: crop.id,
+          plantedAt: (state.day - 1) * 1440 + state.minutes,
+          remainingHours,
+          watered: false,
+          fertilized: false,
+          ready: false,
+        } : item),
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '播种完成', message: `${crop.name}将在 ${remainingHours} 小时后成熟。` })],
+      }
+    }
     case 'WATER_PLOT':
       return {
         ...state,
@@ -109,40 +168,48 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'HARVEST_PLOT': {
       const plot = state.plots.find((item) => item.id === action.plotId)
       if (!plot?.cropId || !plot.ready) return state
-      const harvestAmount = 3
+      const harvestAmount = scaleReward(3, state.rules.dropMultiplier)
+      const farmingExperience = scaleReward(10, state.rules.experienceMultiplier)
       return {
         ...state,
         inventory: { ...state.inventory, [plot.cropId]: (state.inventory[plot.cropId] ?? 0) + harvestAmount },
         plots: state.plots.map((item) => item.id === action.plotId
           ? { id: item.id, row: item.row, column: item.column, watered: false, fertilized: false, ready: false }
           : item),
+        skills: {
+          ...state.skills,
+          farming: { ...state.skills.farming, experience: state.skills.farming.experience + farmingExperience },
+        },
         toasts: [...state.toasts, makeToast({ tone: 'success', title: '收获完成', message: `已将 ${harvestAmount} 份作物收入背包。` })],
       }
     }
     case 'CHAT_WITH_NPC': {
-      if (state.energy < 1) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: '今天已经没有精力继续交谈。' })] }
+      const cost = getEnergyCost(1, state.rules.energyCostMode)
+      if (state.energy < cost) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: '今天已经没有精力继续交谈。' })] }
       const relationship = state.relationships[action.npcId]
-      const gain = relationship.chattedToday ? 0 : 6
+      const gain = relationship.chattedToday ? 0 : scaleReward(6, state.rules.affinityMultiplier)
       const affinity = relationship.affinity + gain
       return {
         ...state,
-        energy: state.energy - 1,
+        energy: state.energy - cost,
         relationships: { ...state.relationships, [action.npcId]: { ...relationship, affinity, stage: affinityStage(affinity), chattedToday: true } },
       }
     }
     case 'GIVE_GIFT': {
       const relationship = state.relationships[action.npcId]
-      if (state.energy < 1 || (state.inventory[action.itemId] ?? 0) < 1 || relationship.giftedToday) {
-        const message = state.energy < 1 ? '精力不足，无法赠礼。' : relationship.giftedToday ? '今天已经向她赠过礼物。' : '背包里没有这件礼物。'
+      const cost = getEnergyCost(1, state.rules.energyCostMode)
+      if (state.energy < cost || (state.inventory[action.itemId] ?? 0) < 1 || relationship.giftedToday) {
+        const message = state.energy < cost ? '精力不足，无法赠礼。' : relationship.giftedToday ? '今天已经向她赠过礼物。' : '背包里没有这件礼物。'
         return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '赠礼未完成', message })] }
       }
-      const affinity = relationship.affinity + action.affinity
+      const affinityGain = scaleReward(action.affinity, state.rules.affinityMultiplier)
+      const affinity = relationship.affinity + affinityGain
       return {
         ...state,
-        energy: state.energy - 1,
+        energy: state.energy - cost,
         inventory: { ...state.inventory, [action.itemId]: state.inventory[action.itemId] - 1 },
         relationships: { ...state.relationships, [action.npcId]: { ...relationship, affinity, stage: affinityStage(affinity), giftedToday: true, memoryTags: [...relationship.memoryTags, '收到用心挑选的礼物'] } },
-        toasts: [...state.toasts, makeToast({ tone: 'success', title: '心意送达', message: `好感提升了 ${action.affinity} 点。` })],
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '心意送达', message: `好感提升了 ${affinityGain} 点。` })],
       }
     }
     case 'SUBMIT_QUEST': {
@@ -152,11 +219,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
       const issuer = state.relationships[quest.issuerId]
       const mayor = state.relationships.loran
-      const issuerAffinity = issuer.affinity + quest.rewardAffinity
-      const mayorAffinity = mayor.affinity + quest.mayorAffinity
+      const rewardMoney = scaleReward(quest.rewardMoney, state.rules.moneyMultiplier)
+      const issuerGain = scaleReward(quest.rewardAffinity, state.rules.affinityMultiplier)
+      const mayorGain = scaleReward(quest.mayorAffinity, state.rules.affinityMultiplier)
+      const issuerAffinity = issuer.affinity + issuerGain
+      const mayorAffinity = mayor.affinity + mayorGain
       return {
         ...state,
-        money: state.money + quest.rewardMoney,
+        money: state.money + rewardMoney,
         inventory: { ...state.inventory, [quest.requiredItemId]: state.inventory[quest.requiredItemId] - quest.requiredAmount },
         quests: state.quests.map((item) => item.id === quest.id ? { ...item, status: 'completed' } : item),
         relationships: {
@@ -164,7 +234,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           [quest.issuerId]: { ...issuer, affinity: issuerAffinity, stage: affinityStage(issuerAffinity), memoryTags: [...issuer.memoryTags, `完成委托「${quest.title}」`] },
           loran: { ...mayor, affinity: mayorAffinity, stage: affinityStage(mayorAffinity) },
         },
-        toasts: [...state.toasts, makeToast({ tone: 'success', title: '委托完成', message: `获得 ${quest.rewardMoney} 金币，发布者与村长的好感都提升了。` })],
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '委托完成', message: `获得 ${rewardMoney} 金币，发布者与村长的好感都提升了。` })],
       }
     }
     case 'ACCEPT_QUEST':
@@ -176,35 +246,45 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SELL_ITEM': {
       const protectedByQuest = state.quests.some((quest) => quest.status === 'active' && quest.requiredItemId === action.itemId)
       if (action.quantity < 1 || (state.inventory[action.itemId] ?? 0) < action.quantity || protectedByQuest) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '无法出售', message: protectedByQuest ? '任务物品受到保护，完成或放弃委托后才能出售。' : '持有数量不足。' })] }
-      return { ...state, money: state.money + action.total, inventory: { ...state.inventory, [action.itemId]: state.inventory[action.itemId] - action.quantity }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '出售完成', message: `获得 ${action.total} 金币。` })] }
+      const income = scaleReward(action.total, state.rules.moneyMultiplier)
+      return { ...state, money: state.money + income, inventory: { ...state.inventory, [action.itemId]: state.inventory[action.itemId] - action.quantity }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '出售完成', message: `获得 ${income} 金币。` })] }
     }
     case 'USE_HOSPITAL': {
       if (state.hospitalUsedToday || state.money < 180 || state.energy >= state.maxEnergy) return state
-      return { ...state, money: state.money - 180, energy: Math.min(state.maxEnergy, state.energy + 2), hospitalUsedToday: true, toasts: [...state.toasts, makeToast({ tone: 'success', title: '治疗完成', message: '草药热敷让你恢复了 2 点精力。' })] }
+      const recovery = scaleReward(2, state.rules.recoveryMultiplier)
+      return { ...state, money: state.money - 180, energy: Math.min(state.maxEnergy, state.energy + recovery), hospitalUsedToday: true, toasts: [...state.toasts, makeToast({ tone: 'success', title: '治疗完成', message: `草药热敷让你恢复了 ${recovery} 点精力。` })] }
     }
     case 'BUY_RANCH':
       if (state.ownsMonsterRanch || state.money < 2800) return state
       return { ...state, money: state.money - 2800, ownsMonsterRanch: true, toasts: [...state.toasts, makeToast({ tone: 'success', title: '牧场合同生效', message: '现在可以邀请魔物娘经营伙伴入住了。' })] }
     case 'TRAIN_COMBAT': {
-      if (state.energy < 1) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: '需要 1 点精力才能完成训练。' })] }
-      return { ...state, energy: state.energy - 1, skills: { ...state.skills, combat: { ...state.skills.combat, experience: state.skills.combat.experience + 18 } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '训练完成', message: '战斗经验提升 18 点。' })] }
+      const cost = getEnergyCost(1, state.rules.energyCostMode)
+      if (state.energy < cost) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: `需要 ${cost} 点精力才能完成训练。` })] }
+      const experience = scaleReward(18, state.rules.experienceMultiplier)
+      return { ...state, energy: state.energy - cost, skills: { ...state.skills, combat: { ...state.skills.combat, experience: state.skills.combat.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '训练完成', message: `战斗经验提升 ${experience} 点。` })] }
     }
     case 'LEARN_SPELL': {
       const spell = spells.find((item) => item.id === action.spellId)
-      if (!spell || state.knownSpells.includes(spell.id) || spell.requiredLevel > state.skills.magic.level || state.energy < 1) return state
-      return { ...state, energy: state.energy - 1, knownSpells: [...state.knownSpells, spell.id], skills: { ...state.skills, magic: { ...state.skills.magic, experience: state.skills.magic.experience + 10 } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '法术习得', message: `你掌握了「${spell.name}」。` })] }
+      const cost = getEnergyCost(1, state.rules.energyCostMode)
+      if (!spell || state.knownSpells.includes(spell.id) || spell.requiredLevel > state.skills.magic.level || state.energy < cost) return state
+      const experience = scaleReward(10, state.rules.experienceMultiplier)
+      return { ...state, energy: state.energy - cost, knownSpells: [...state.knownSpells, spell.id], skills: { ...state.skills, magic: { ...state.skills.magic, experience: state.skills.magic.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '法术习得', message: `你掌握了「${spell.name}」。` })] }
     }
     case 'ENTER_MINE_FLOOR': {
-      if (state.energy < 1 || action.floor < 1 || action.floor > state.mine.highestFloor + 1) return state
+      const cost = getEnergyCost(1, state.rules.energyCostMode)
+      if (state.energy < cost || action.floor < 1 || action.floor > state.mine.highestFloor + 1) return state
       const highestFloor = Math.max(state.mine.highestFloor, action.floor)
       const unlockedElevators = action.floor % 5 === 0 && !state.mine.unlockedElevators.includes(action.floor) ? [...state.mine.unlockedElevators, action.floor] : state.mine.unlockedElevators
-      return { ...state, energy: state.energy - 1, mine: { currentFloor: action.floor, highestFloor, unlockedElevators }, toasts: [...state.toasts, makeToast({ tone: 'info', title: `抵达第 ${action.floor} 层`, message: action.floor % 5 === 0 ? '这里是安全电梯层，没有魔物，但仍可挖矿。' : '黑暗里传来魔物移动的回声。' })] }
+      return { ...state, energy: state.energy - cost, mine: { currentFloor: action.floor, highestFloor, unlockedElevators }, toasts: [...state.toasts, makeToast({ tone: 'info', title: `抵达第 ${action.floor} 层`, message: action.floor % 5 === 0 ? '这里是安全电梯层，没有魔物，但仍可挖矿。' : '黑暗里传来魔物移动的回声。' })] }
     }
     case 'MINE_ORE': {
-      if (state.energy < 1) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: '需要 1 点精力才能开采矿脉。' })] }
-      const copper = 1 + Math.floor(action.floor / 3)
-      const iron = action.floor >= 5 ? Math.floor(action.floor / 5) : 0
-      return { ...state, energy: state.energy - 1, inventory: { ...state.inventory, 'copper-ore': (state.inventory['copper-ore'] ?? 0) + copper, 'iron-ore': (state.inventory['iron-ore'] ?? 0) + iron }, skills: { ...state.skills, mining: { ...state.skills.mining, experience: state.skills.mining.experience + 12 + action.floor } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '矿脉开采完成', message: `获得铜矿石 ${copper}${iron ? `、铁矿石 ${iron}` : ''}。` })] }
+      const cost = getEnergyCost(1, state.rules.energyCostMode)
+      if (state.energy < cost) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: `需要 ${cost} 点精力才能开采矿脉。` })] }
+      const copper = scaleReward(1 + Math.floor(action.floor / 3), state.rules.dropMultiplier)
+      const baseIron = action.floor >= 5 ? Math.floor(action.floor / 5) : 0
+      const iron = baseIron > 0 ? scaleReward(baseIron, state.rules.dropMultiplier) : 0
+      const experience = scaleReward(12 + action.floor, state.rules.experienceMultiplier)
+      return { ...state, energy: state.energy - cost, inventory: { ...state.inventory, 'copper-ore': (state.inventory['copper-ore'] ?? 0) + copper, 'iron-ore': (state.inventory['iron-ore'] ?? 0) + iron }, skills: { ...state.skills, mining: { ...state.skills.mining, experience: state.skills.mining.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '矿脉开采完成', message: `获得铜矿石 ${copper}${iron ? `、铁矿石 ${iron}` : ''}。` })] }
     }
     case 'START_BATTLE': {
       if (action.floor % 5 === 0) return state
@@ -224,37 +304,49 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let inventory = state.inventory
       const log = [...battle.log]
       let damage = 0
-      if (action.action === 'physical') { damage = state.stats.attack; log.push(`你挥出武器，造成 ${damage} 点物理伤害。`) }
+      if (action.action === 'physical') { damage = scaleDamage(state.stats.attack, state.rules.playerDamageMultiplier); log.push(`你挥出武器，造成 ${damage} 点物理伤害。`) }
       if (action.action === 'spell') {
         const spell = spells.find((item) => item.id === action.spellId)
         if (!spell || !state.knownSpells.includes(spell.id) || playerMana < spell.manaCost) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '无法施法', message: '魔力不足或尚未掌握该法术。' })] }
         playerMana -= spell.manaCost
         const multiplier = elementAdvantage(spell.element, battle.enemyElement)
-        damage = Math.max(1, Math.round((spell.power + state.stats.magicDamage) * multiplier))
+        damage = scaleDamage((spell.power + state.stats.magicDamage) * multiplier, state.rules.playerDamageMultiplier)
         log.push(`你施放「${spell.name}」，五行倍率 ${multiplier}，造成 ${damage} 点伤害。`)
       }
       if (action.action === 'item') {
         if ((inventory['energy-tonic'] ?? 0) < 1) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '道具不足', message: '背包里没有金盏恢复剂。' })] }
-        playerHealth = Math.min(state.stats.maxHealth, playerHealth + 10)
+        const recovery = scaleReward(10, state.rules.recoveryMultiplier)
+        playerHealth = Math.min(state.stats.maxHealth, playerHealth + recovery)
         inventory = { ...inventory, 'energy-tonic': inventory['energy-tonic'] - 1 }
-        log.push('你使用金盏恢复剂，恢复 10 点生命。')
+        log.push(`你使用金盏恢复剂，恢复 ${recovery} 点生命。`)
       }
       enemyHealth = Math.max(0, enemyHealth - damage)
-      if (enemyHealth <= 0) return { ...state, stats: { ...state.stats, health: playerHealth, mana: playerMana }, inventory, battle: { ...battle, enemyHealth: 0, ended: 'victory', log: [...log, `${battle.enemyName}化作散落的灵光，战斗胜利。`] }, skills: { ...state.skills, combat: { ...state.skills.combat, experience: state.skills.combat.experience + 14 + battle.floor } } }
-      const enemyDamage = action.action === 'defend' ? 2 : 5 + Math.floor(battle.floor / 4)
+      if (enemyHealth <= 0) {
+        const experience = scaleReward(14 + battle.floor, state.rules.experienceMultiplier)
+        return { ...state, stats: { ...state.stats, health: playerHealth, mana: playerMana }, inventory, battle: { ...battle, enemyHealth: 0, ended: 'victory', log: [...log, `${battle.enemyName}化作散落的灵光，战斗胜利。`] }, skills: { ...state.skills, combat: { ...state.skills.combat, experience: state.skills.combat.experience + experience } } }
+      }
+      const baseEnemyDamage = action.action === 'defend' ? 2 : 5 + Math.floor(battle.floor / 4)
+      const enemyDamage = scaleDamage(baseEnemyDamage, state.rules.enemyDamageMultiplier)
       playerHealth = Math.max(0, playerHealth - enemyDamage)
       log.push(action.action === 'defend' ? `你架起防御，只受到 ${enemyDamage} 点伤害。` : `${battle.enemyName}反击，造成 ${enemyDamage} 点伤害。`)
       return { ...state, stats: { ...state.stats, health: playerHealth, mana: playerMana }, inventory, battle: { ...battle, enemyHealth, turn: battle.turn + 1, ended: playerHealth <= 0 ? 'defeat' : undefined, log } }
     }
     case 'PLAYER_DEFEATED':
-      return { ...state, day: state.day + 1, minutes: 6 * 60 + 30, location: 'farm', energy: state.maxEnergy, stats: { ...state.stats, health: state.stats.maxHealth, mana: state.stats.maxMana }, mine: { ...state.mine, currentFloor: 1 }, hospitalUsedToday: false, activeModal: null, battle: undefined, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '翌日苏醒', message: '你在农场床上醒来，精力、生命与魔力已经恢复。' })] }
+      return { ...state, day: state.day + 1, minutes: 6 * 60 + 30, location: 'farm', energy: state.maxEnergy, stats: { ...state.stats, health: state.stats.maxHealth, mana: state.stats.maxMana }, plots: advancePlots(state, Math.max(0, 24 * 60 - state.minutes) + 6 * 60 + 30), mine: { ...state.mine, currentFloor: 1 }, hospitalUsedToday: false, activeModal: null, battle: undefined, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '翌日苏醒', message: '你在农场床上醒来，精力、生命与魔力已经恢复。' })] }
     case 'START_FISHING':
-      if (state.energy < 1) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: '需要 1 点精力才能抛竿。' })] }
-      return { ...state, energy: state.energy - 1, fishing: { active: true } }
+      if (state.energy < getEnergyCost(1, state.rules.energyCostMode)) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: `需要 ${getEnergyCost(1, state.rules.energyCostMode)} 点精力才能抛竿。` })] }
+      return { ...state, energy: state.energy - getEnergyCost(1, state.rules.energyCostMode), fishing: { active: true } }
     case 'CATCH_FISH': {
       if (!state.fishing.active) return state
-      if (action.result === 'silver-carp') return { ...state, fishing: { active: false, lastCatch: 'silver-carp' }, inventory: { ...state.inventory, 'silver-carp': (state.inventory['silver-carp'] ?? 0) + 1, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) }, skills: { ...state.skills, fishing: { ...state.skills.fishing, experience: state.skills.fishing.experience + 16 } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '钓到银鳞鲫', message: '钓鱼经验 +16，鱼获已放入背包。' })] }
-      if (action.result === 'water-grass') return { ...state, fishing: { active: false, lastCatch: 'water-grass' }, inventory: { ...state.inventory, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) }, skills: { ...state.skills, fishing: { ...state.skills.fishing, experience: state.skills.fishing.experience + 4 } } }
+      if (action.result === 'silver-carp') {
+        const amount = scaleReward(1, state.rules.dropMultiplier)
+        const experience = scaleReward(16, state.rules.experienceMultiplier)
+        return { ...state, fishing: { active: false, lastCatch: 'silver-carp' }, inventory: { ...state.inventory, 'silver-carp': (state.inventory['silver-carp'] ?? 0) + amount, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) }, skills: { ...state.skills, fishing: { ...state.skills.fishing, experience: state.skills.fishing.experience + experience } }, toasts: [...state.toasts, makeToast({ tone: 'success', title: '钓到银鳞鲫', message: `钓鱼经验 +${experience}，获得鱼获 ${amount} 份。` })] }
+      }
+      if (action.result === 'water-grass') {
+        const experience = scaleReward(4, state.rules.experienceMultiplier)
+        return { ...state, fishing: { active: false, lastCatch: 'water-grass' }, inventory: { ...state.inventory, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) }, skills: { ...state.skills, fishing: { ...state.skills.fishing, experience: state.skills.fishing.experience + experience } } }
+      }
       return { ...state, fishing: { active: false, lastCatch: 'empty' }, inventory: { ...state.inventory, 'reed-bait': Math.max(0, (state.inventory['reed-bait'] ?? 0) - 1) } }
     }
     case 'UPGRADE_TOOL': {

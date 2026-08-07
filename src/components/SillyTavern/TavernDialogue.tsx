@@ -23,6 +23,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef(false)
+  const settlementRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -51,6 +52,10 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const send = async (text: string) => {
     const message = text.trim()
     if (!message || working || !session) return
+    if (!tavern.apiReady) {
+      setError(tavern.apiReadinessError ?? '接口尚未就绪，请先完成模型连接配置。')
+      return
+    }
     const controller = new AbortController()
     abortRef.current = controller
     setWorking(true)
@@ -73,10 +78,15 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         signal: controller.signal,
       })
       setSessionSnapshot(next)
+      if (!settlementRef.current) {
+        settlementRef.current = true
+        dispatch({ type: 'CHAT_WITH_NPC', npcId: npc.id })
+      }
     } catch (caught) {
       if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
         setError(caught instanceof Error ? caught.message : '叙事生成失败，请检查接口设置。')
       }
+      setInput(message)
     } finally {
       setWorking(false)
       abortRef.current = null
@@ -101,11 +111,14 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     setSessionSnapshot(next)
   }
 
+  const readinessError = tavern.status === 'ready' && !tavern.apiReady ? tavern.apiReadinessError : null
+  const displayedError = error ?? readinessError
+
   return (
     <section className="dialogue-view tavern-dialogue" role="dialog" aria-modal="false" aria-labelledby={`tavern-dialogue-title-${npc.id}`}>
       <header>
         <div>
-          <span>{tavern.settings?.adapterMode === 'remote' ? 'REMOTE TAVERN' : 'LOCAL TAVERN'} · 好感 {relationship.affinity}</span>
+          <span>REMOTE TAVERN · 好感 {relationship.affinity}</span>
           <h2 id={`tavern-dialogue-title-${npc.id}`}>与{npc.name}的酒馆会话</h2>
         </div>
         <div className="tavern-dialogue-header-actions">
@@ -135,27 +148,27 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
             {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
           </article>
         ))}
-        {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span><p><i className="typing-caret" aria-label="正在组织回应" /> {tavern.settings?.adapterMode === 'remote' ? '模型正在读取角色卡与世界书……' : '正在结合角色卡与本地记忆……'}</p></article>}
+        {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span><p><i className="typing-caret" aria-label="正在组织回应" /> 模型正在读取角色卡与世界书……</p></article>}
       </div>
 
       <div className="tavern-options" aria-label="本回合可选行动">
         {options.map((option, index) => (
-          <button id={`dialogue-option-${npc.id}-${index}`} key={`${option}-${index}`} type="button" aria-label={`选择行动：${option}`} disabled={working || !session} onClick={() => void send(option)}>
+          <button id={`dialogue-option-${npc.id}-${index}`} key={`${option}-${index}`} type="button" aria-label={`选择行动：${option}`} disabled={working || !session || !tavern.apiReady} onClick={() => void send(option)}>
             <span>{String(index + 1).padStart(2, '0')}</span>{option}<GameIcon name="send" size={15} />
           </button>
         ))}
       </div>
 
-      {error && <div className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={17} /><span>{error}</span></div>}
+      {displayedError && <div className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={17} /><span>{displayedError}</span><button id={`dialogue-open-api-${npc.id}`} type="button" aria-label="打开接口设置" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'tavern' })}>打开接口设置</button></div>}
 
       <form className="dialogue-composer tavern-composer" onSubmit={submit}>
         <label htmlFor={`dialogue-input-${npc.id}`}>自由输入</label>
-        <textarea id={`dialogue-input-${npc.id}`} value={input} maxLength={220} rows={2} disabled={working || !session} placeholder="描述你的选择、问题或此刻的心情……" onChange={(event) => setInput(event.target.value)} />
+        <textarea id={`dialogue-input-${npc.id}`} value={input} maxLength={220} rows={2} disabled={working || !session || !tavern.apiReady} placeholder={tavern.apiReady ? '描述你的选择、问题或此刻的心情……' : '请先完成 API 接口配置'} onChange={(event) => setInput(event.target.value)} />
         <div>
-          <small>{input.length} / 220 · {tavern.settings?.adapterMode === 'remote' ? '消息将发送到已配置的模型服务' : '只在本机生成并保存'}</small>
+          <small>{input.length} / 220 · 消息将发送到已配置的模型服务</small>
           {working
             ? <button id={`dialogue-stop-${npc.id}`} className="secondary-button" type="button" onClick={() => abortRef.current?.abort()}><GameIcon name="stop" size={16} />停止生成</button>
-            : <button id={`dialogue-send-${npc.id}`} className="primary-button" type="submit" disabled={!input.trim() || !session}><GameIcon name="send" size={16} />送出话语</button>}
+            : <button id={`dialogue-send-${npc.id}`} className="primary-button" type="submit" disabled={!input.trim() || !session || !tavern.apiReady}><GameIcon name="send" size={16} />送出话语</button>}
         </div>
       </form>
 

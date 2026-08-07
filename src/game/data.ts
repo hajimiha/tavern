@@ -1,6 +1,12 @@
 import type { Crop, Location, Npc, Plot, Quest, ShopItem, Spell } from './types'
 
 export const itemDisplayNames: Record<string, string> = {
+  'moon-radish-seed': '月铃萝卜种子',
+  'mist-bean-seed': '雾荚豆种子',
+  'sun-wheat-seed': '夕照麦种子',
+  'moon-radish': '月铃萝卜',
+  'mist-bean': '雾荚豆',
+  'sun-wheat': '夕照麦',
   moonflower: '月铃花',
   'silver-carp': '银鳞鲫',
   honey: '林蜜',
@@ -46,18 +52,18 @@ export const locations: Location[] = [
 ]
 
 export const crops: Crop[] = [
-  { id:'moon-radish', name:'月铃萝卜', season:'秋', growthHours:56, sellPrice:90, color:'#b5a5d6', description:'成熟时根须会发出风铃般的轻响。' },
+  { id:'moon-radish', name:'月铃萝卜', season:'春', growthHours:56, sellPrice:90, color:'#b5a5d6', description:'成熟时根须会发出风铃般的轻响。' },
   { id:'sun-wheat', name:'夕照麦', season:'秋', growthHours:96, sellPrice:135, color:'#d5a64a', description:'麦芒会储存傍晚最后一束光。' },
-  { id:'mist-bean', name:'雾荚豆', season:'秋', growthHours:72, sellPrice:110, color:'#86b86d', description:'雨天收成更好的攀藤豆。' },
+  { id:'mist-bean', name:'雾荚豆', season:'春', growthHours:72, sellPrice:110, color:'#86b86d', description:'雨天收成更好的攀藤豆。' },
   { id:'ember-berry', name:'余烬莓', season:'秋', growthHours:120, sellPrice:185, color:'#c95d5d', description:'用于制作火属性药剂。' },
   { id:'tide-lotus', name:'潮汐莲', season:'夏', growthHours:144, sellPrice:220, color:'#5fa8bc', description:'只在浇水充足的地块开花。' },
   { id:'stone-pumpkin', name:'岩纹南瓜', season:'秋', growthHours:168, sellPrice:260, color:'#c07a42', description:'表皮坚硬，是铁匠喜爱的礼物。' },
 ]
 
 export const shopItems: ShopItem[] = [
-  { id:'moon-radish-seed', name:'月铃萝卜种子', category:'seed', price:38, sellPrice:18, description:'秋季种子，成熟迅速。', season:'秋', growthDays:3 },
+  { id:'moon-radish-seed', name:'月铃萝卜种子', category:'seed', price:38, sellPrice:18, description:'春季种子，成熟迅速。', season:'春', growthDays:3 },
   { id:'sun-wheat-seed', name:'夕照麦种子', category:'seed', price:62, sellPrice:30, description:'秋季谷物种子。', season:'秋', growthDays:4 },
-  { id:'mist-bean-seed', name:'雾荚豆种子', category:'seed', price:55, sellPrice:26, description:'秋季攀藤作物。', season:'秋', growthDays:3 },
+  { id:'mist-bean-seed', name:'雾荚豆种子', category:'seed', price:55, sellPrice:26, description:'春季攀藤作物。', season:'春', growthDays:3 },
   { id:'moss-fertilizer', name:'苔肥', category:'material', price:80, sellPrice:35, description:'令作物提前八小时成熟。' },
   { id:'copper-ore', name:'铜矿石', category:'material', price:120, sellPrice:55, description:'工具升级的基础材料。' },
   { id:'iron-ore', name:'铁矿石', category:'material', price:210, sellPrice:95, description:'锻造可靠工具的矿石。' },

@@ -1,4 +1,5 @@
-import { createContext, useContext, useMemo, useReducer } from 'react'
+import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
+import { loadGameRules, saveGameRules } from './game-settings-storage'
 import { gameReducer, initialGameState } from './reducer'
 import type { GameAction, GameProviderProps, GameState } from './types'
 
@@ -6,8 +7,12 @@ interface GameContextValue { state: GameState; dispatch: React.Dispatch<GameActi
 
 const GameContext = createContext<GameContextValue | null>(null)
 
-export function GameProvider({ children, initialState = initialGameState }: GameProviderProps) {
-  const [state, dispatch] = useReducer(gameReducer, initialState)
+export function GameProvider({ children, initialState }: GameProviderProps) {
+  const [state, dispatch] = useReducer(gameReducer, initialState, (provided) => ({
+    ...(provided ?? initialGameState),
+    rules: provided?.rules ?? loadGameRules(),
+  }))
+  useEffect(() => saveGameRules(state.rules), [state.rules])
   const value = useMemo(() => ({ state, dispatch }), [state])
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>
 }
