@@ -1,4 +1,5 @@
 import { createMistvaleDefaults } from './defaults'
+import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
 import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernSettings } from './types'
@@ -79,14 +80,18 @@ class DexieTavernRepository implements TavernRepository {
 
   async getSettings(): Promise<TavernSettings> {
     const current = await this.database.settings.get('mistvale-settings')
-    if (current) return current
+    if (current) {
+      const normalized = normalizeTavernSettings(current)
+      if (JSON.stringify(normalized) !== JSON.stringify(current)) await this.database.settings.put(normalized)
+      return normalized
+    }
     const defaults = createMistvaleDefaults().settings
     await this.database.settings.put(defaults)
     return defaults
   }
 
   async saveSettings(value: TavernSettings): Promise<void> {
-    await this.database.settings.put(value)
+    await this.database.settings.put(normalizeTavernSettings(value))
   }
 }
 

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createDisabledTavernApi } from './api-adapter'
+import { createMistvaleDefaults } from './defaults'
+import {
+  createDisabledTavernApi,
+  createRemoteTavernApi,
+  TavernApiRequestError,
+  testTavernApiConnection,
+} from './api-adapter'
 
 async function collect<T>(source: AsyncIterable<T>) {
   const result: T[] = []
@@ -25,5 +31,94 @@ describe('本地优先酒馆 API 适配器', () => {
     })
     expect(fetchSpy).not.toHaveBeenCalled()
     fetchSpy.mockRestore()
+  })
+
+  it('以 OpenAI-compatible 格式发送请求并解析 SSE 增量', async () => {
+    const config = createMistvaleDefaults().settings.api
+    const fetchMock = vi.fn().mockResolvedValue(new Response([
+      'data: {"choices":[{"delta":{"content":"洛岚"}}]}',
+      '',
+      'data: {"choices":[{"delta":{"content":"向你点头。"}}]}',
+      '',
+      'data: [DONE]',
+      '',
+    ].join('\n'), { headers: { 'content-type': 'text/event-stream' } }))
+    const api = createRemoteTavernApi(config, 'secret-key', fetchMock)
+    const preview = api.prepare({
+      task: 'story',
+      messages: [{ role: 'user', content: '早上好' }],
+    })
+
+    expect(await collect(api.stream(preview))).toEqual([
+      { type: 'delta', text: '洛岚' },
+      { type: 'delta', text: '向你点头。' },
+      { type: 'done' },
+    ])
+    expect(fetchMock).toHaveBeenCalledWith('https://api.deepseek.com/chat/completions', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ Authorization: 'Bearer secret-key' }),
+    }))
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(body).toMatchObject({ model: 'deepseek-v4-flash', stream: true, temperature: 0.8, max_tokens: 1200 })
+    expect(body.messages).toEqual([{ role: 'user', content: '早上好' }])
+  })
+
+  it('兼容不支持流式返回的普通 JSON 响应', async () => {
+    const config = createMistvaleDefaults().settings.api
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: '普通响应正文' } }],
+    }), { headers: { 'content-type': 'application/json' } }))
+    const api = createRemoteTavernApi(config, 'secret-key', fetchMock)
+
+    const events = await collect(api.stream(api.prepare({
+      task: 'story',
+      messages: [{ role: 'user', content: '继续' }],
+    })))
+
+    expect(events).toEqual([{ type: 'delta', text: '普通响应正文' }, { type: 'done' }])
+  })
+
+  it('通过模型列表端点测试连接并返回可用模型', async () => {
+    const config = createMistvaleDefaults().settings.api
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: 'deepseek-v4-flash' }, { id: 'deepseek-v4-pro' }],
+    }), { headers: { 'content-type': 'application/json' } }))
+
+    const result = await testTavernApiConnection(config, 'secret-key', fetchMock)
+
+    expect(result.models).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
+    expect(fetchMock).toHaveBeenCalledWith('https://api.deepseek.com/models', expect.objectContaining({
+      method: 'GET',
+      headers: expect.objectContaining({ Authorization: 'Bearer secret-key' }),
+    }))
+  })
+
+  it.each([
+    [401, 'TAVERN_API_UNAUTHORIZED'],
+    [429, 'TAVERN_API_RATE_LIMITED'],
+  ])('将 HTTP %s 映射为可执行的中文错误', async (status, code) => {
+    const config = createMistvaleDefaults().settings.api
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: 'provider detail' } }), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    }))
+    const api = createRemoteTavernApi(config, 'secret-key', fetchMock)
+
+    await expect(collect(api.stream(api.prepare({ task: 'story', messages: [{ role: 'user', content: '测试' }] })))).rejects.toMatchObject({
+      name: 'TavernApiRequestError',
+      code,
+      status,
+    })
+  })
+
+  it('缺少密钥时在请求前中止', async () => {
+    const config = createMistvaleDefaults().settings.api
+    const fetchMock = vi.fn()
+    const api = createRemoteTavernApi(config, '', fetchMock)
+
+    await expect(collect(api.stream(api.prepare({ task: 'story', messages: [{ role: 'user', content: '测试' }] })))).rejects.toEqual(expect.objectContaining({
+      code: 'TAVERN_API_KEY_MISSING',
+    } satisfies Partial<TavernApiRequestError>))
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

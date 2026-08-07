@@ -19,7 +19,7 @@ afterEach(async () => {
 })
 
 describe('酒馆中枢', () => {
-  it('提供六个可键盘切换的本地管理标签且不呈现密钥入口', async () => {
+  it('提供六个可键盘切换的酒馆管理标签与真实接口入口', async () => {
     const user = userEvent.setup()
     database = createTavernDatabase(`mistvale-hub-${crypto.randomUUID()}`)
     render(
@@ -33,8 +33,8 @@ describe('酒馆中枢', () => {
     const tabs = screen.getAllByRole('tab')
     expect(tabs).toHaveLength(6)
     expect(screen.getByRole('tab', { name: '接口' })).toHaveAttribute('id', 'tavern-tab-api')
-    expect(screen.getByText('不会发送网络请求')).toBeVisible()
-    expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument()
+    expect(await screen.findByText('浏览器直连提醒')).toBeVisible()
+    expect(screen.getByLabelText('API 密钥')).toBeVisible()
 
     await user.click(screen.getByRole('tab', { name: '角色卡' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: /编辑角色卡/ })).toHaveLength(15))

@@ -1,17 +1,158 @@
-import { useMemo } from 'react'
-import { createDisabledTavernApi } from '../../../sillytavern/api-adapter'
+import { useEffect, useState, type FormEvent } from 'react'
+import { testTavernApiConnection } from '../../../sillytavern/api-adapter'
+import { getSessionApiKey, setSessionApiKey } from '../../../sillytavern/api-credentials'
+import { getTavernApiPreset, validateTavernApiConfig, type TavernApiFieldErrors } from '../../../sillytavern/api-config'
+import { createMistvaleDefaults } from '../../../sillytavern/defaults'
+import type { TavernApiConfig, TavernApiProvider } from '../../../sillytavern/types'
+import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
 
+type Feedback = { tone: 'idle' | 'testing' | 'success' | 'error'; message: string }
+type FormErrors = TavernApiFieldErrors & { apiKey?: string }
+
+const defaultSettings = createMistvaleDefaults().settings
+
 export function ApiPanel() {
-  const preview = useMemo(() => createDisabledTavernApi().prepare({ task: 'story', messages: [{ role: 'user', content: '示例：询问洛岚今日的村民委托。' }], context: { character: '洛岚', lorebooks: 2, mode: 'local' } }), [])
+  const tavern = useTavern()
+  const [adapterMode, setAdapterMode] = useState<'local' | 'remote'>(defaultSettings.adapterMode)
+  const [config, setConfig] = useState<TavernApiConfig>(() => ({ ...defaultSettings.api }))
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [feedback, setFeedback] = useState<Feedback>({ tone: 'idle', message: '尚未测试当前连接。' })
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!tavern.settings) return
+    setAdapterMode(tavern.settings.adapterMode)
+    setConfig({ ...tavern.settings.api })
+    setApiKey(getSessionApiKey() || (tavern.settings.api.rememberKey ? tavern.settings.api.persistedApiKey ?? '' : ''))
+  }, [tavern.settings])
+
+  const providerLabel = config.provider === 'deepseek' ? 'DeepSeek' : '自定义兼容接口'
+  const remoteReady = adapterMode === 'remote' && Boolean(apiKey.trim())
+
+  const validate = (requireKey: boolean): FormErrors => {
+    const next: FormErrors = validateTavernApiConfig(config)
+    if (requireKey && !apiKey.trim()) next.apiKey = '请填写 API 密钥后再连接模型。'
+    setErrors(next)
+    return next
+  }
+
+  const changeProvider = (provider: TavernApiProvider) => {
+    const preset = getTavernApiPreset(provider)
+    setConfig((current) => ({ ...current, ...preset }))
+    setAvailableModels([])
+    setFeedback({ tone: 'idle', message: '提供方已切换，请重新测试连接。' })
+  }
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault()
+    if (Object.keys(validate(adapterMode === 'remote')).length) {
+      setFeedback({ tone: 'error', message: '配置尚未完整，请检查标出的字段。' })
+      return
+    }
+    setSaving(true)
+    try {
+      const normalizedKey = apiKey.trim()
+      setSessionApiKey(normalizedKey)
+      const nextApi: TavernApiConfig = {
+        ...config,
+        baseUrl: config.baseUrl.trim().replace(/\/+$/, ''),
+        model: config.model.trim(),
+        persistedApiKey: config.rememberKey && normalizedKey ? normalizedKey : undefined,
+      }
+      await tavern.updateSettings({ adapterMode, api: nextApi })
+      setFeedback({ tone: 'success', message: '接口配置已保存。' })
+    } catch (caught) {
+      setFeedback({ tone: 'error', message: caught instanceof Error ? caught.message : '接口配置保存失败。' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const testConnection = async () => {
+    if (Object.keys(validate(true)).length) {
+      setFeedback({ tone: 'error', message: '请先补全接口地址、密钥和模型名称。' })
+      return
+    }
+    setFeedback({ tone: 'testing', message: '正在验证密钥并读取模型列表……' })
+    try {
+      const result = await testTavernApiConnection(config, apiKey)
+      setSessionApiKey(apiKey)
+      setAvailableModels(result.models)
+      setFeedback({
+        tone: 'success',
+        message: result.models.length
+          ? `连接成功，发现 ${result.models.length} 个可用模型。`
+          : '连接成功；服务未返回可枚举的模型列表。',
+      })
+    } catch (caught) {
+      setFeedback({ tone: 'error', message: caught instanceof Error ? caught.message : '连接测试失败。' })
+    }
+  }
+
+  if (!tavern.settings) {
+    return <section className="tavern-panel api-panel" aria-label="接口配置载入中"><div className="tavern-panel-loading" role="status"><i /><i /><i /><span>正在读取接口设置</span></div></section>
+  }
+
   return <section className="tavern-panel api-panel" aria-labelledby="api-panel-title">
-    <header className="tavern-panel-heading"><div><span>ADAPTER CONTRACT</span><h3 id="api-panel-title">接口边界</h3><p>为未来模型接入保留稳定契约，本阶段只生成预览。</p></div><div className="adapter-state is-disabled"><i /><span>DISABLED</span><strong>模型未接入</strong></div></header>
-    <div className="api-bento">
-      <article className="api-guard-card"><GameIcon name="warning" size={23} /><div><span>硬性安全边界</span><h4>不会发送网络请求</h4><p>当前唯一适配器会在发送阶段返回 <code>TAVERN_API_DISABLED</code>，项目中没有模型地址、密钥输入或连接测试。</p></div></article>
-      <article><span className="panel-kicker">接口能力</span><h4>TavernApiAdapter</h4><dl><div><dt>prepare</dt><dd>创建可审阅请求预览</dd></div><div><dt>stream</dt><dd>禁用并返回类型化错误</dd></div><div><dt>mode</dt><dd>disabled</dd></div></dl></article>
-      <article><span className="panel-kicker">任务通道</span><h4>三类请求已定义</h4><div className="api-task-chips"><span>剧情 STORY</span><span>摘要 SUMMARY</span><span>变量 VARS</span></div><p>次 API 与 schema-first 均未启用。</p></article>
-      <article className="api-flow-card"><span className="panel-kicker">本地执行链</span><h4>角色卡 → 世界书 → 楼层解析</h4><ol><li><b>01</b><span>收集角色、好感与游戏变量</span></li><li><b>02</b><span>本地剧情模拟器组织回应</span></li><li><b>03</b><span>六标签解析并写入 IndexedDB</span></li></ol></article>
-      <article className="api-preview-card"><div><span className="panel-kicker">请求预览</span><strong>{preview.id.slice(0, 8).toUpperCase()}</strong></div><pre>{JSON.stringify(preview.request, null, 2)}</pre></article>
-    </div>
+    <header className="tavern-panel-heading">
+      <div><span>MODEL CONNECTION</span><h3 id="api-panel-title">API 连接配置</h3><p>将角色卡、世界书与游戏变量交给你选择的模型生成 NPC 回应。</p></div>
+      <div className={`adapter-state ${remoteReady ? 'is-remote' : 'is-local'}`}><i /><span>{remoteReady ? 'REMOTE READY' : 'LOCAL MODE'}</span><strong>{remoteReady ? `${providerLabel} 已配置` : '当前使用本地叙事'}</strong></div>
+    </header>
+
+    <form className="api-bento api-config-form" onSubmit={save} noValidate>
+      <article className="api-guard-card api-browser-warning">
+        <GameIcon name="shield" size={24} weight="duotone" />
+        <div><span>浏览器直连提醒</span><h4>密钥由当前浏览器直接发送</h4><p>本项目没有后端代理。默认只在当前标签会话保存密钥；部分服务会因 CORS 策略拒绝浏览器请求，请使用专用于本游戏且额度受限的密钥。</p></div>
+      </article>
+
+      <article className="api-connection-card">
+        <div className="api-card-heading"><div><span className="panel-kicker">01 · 连接路由</span><h4>提供方与接口地址</h4></div><GameIcon name="connect" size={20} /></div>
+        <div className="api-form-grid">
+          <label htmlFor="tavern-api-mode"><span>对话生成方式</span><select id="tavern-api-mode" value={adapterMode} onChange={(event) => setAdapterMode(event.target.value as 'local' | 'remote')}><option value="local">本地叙事（离线）</option><option value="remote">模型 API（在线）</option></select></label>
+          <label htmlFor="tavern-api-provider"><span>聊天补全来源</span><select id="tavern-api-provider" value={config.provider} onChange={(event) => changeProvider(event.target.value as TavernApiProvider)}><option value="deepseek">DeepSeek</option><option value="openai-compatible">自定义（兼容 OpenAI）</option></select></label>
+          <label className="api-field-wide" htmlFor="tavern-api-base-url"><span>接口根地址</span><input id="tavern-api-base-url" type="url" value={config.baseUrl} aria-invalid={Boolean(errors.baseUrl)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, baseUrl: event.target.value }))} /></label>
+          {errors.baseUrl && <small className="api-field-error api-field-wide" role="alert">{errors.baseUrl}</small>}
+        </div>
+      </article>
+
+      <article className="api-secret-card">
+        <div className="api-card-heading"><div><span className="panel-kicker">02 · 凭据</span><h4>密钥与本机存储</h4></div><GameIcon name="shield" size={20} /></div>
+        <label htmlFor="tavern-api-key"><span>API 密钥</span><div className="api-secret-input"><input id="tavern-api-key" type={showKey ? 'text' : 'password'} value={apiKey} autoComplete="off" aria-invalid={Boolean(errors.apiKey)} onBlur={() => validate(adapterMode === 'remote')} onChange={(event) => setApiKey(event.target.value)} /><button id="tavern-api-key-visibility" type="button" aria-label={showKey ? '隐藏 API 密钥' : '显示 API 密钥'} onClick={() => setShowKey((current) => !current)}><GameIcon name={showKey ? 'conceal' : 'reveal'} size={17} /></button></div></label>
+        {errors.apiKey && <small className="api-field-error" role="alert">{errors.apiKey}</small>}
+        <label className="api-remember-key" htmlFor="tavern-api-remember"><input id="tavern-api-remember" type="checkbox" checked={config.rememberKey} onChange={(event) => setConfig((current) => ({ ...current, rememberKey: event.target.checked }))} /><span>仅在这台设备上记住密钥</span></label>
+        <small className="api-storage-note">关闭时只写入 sessionStorage，关闭标签后自动失效；开启后会保存到本机 IndexedDB。</small>
+      </article>
+
+      <article className="api-generation-card">
+        <div className="api-card-heading"><div><span className="panel-kicker">03 · 生成参数</span><h4>模型与回复长度</h4></div><GameIcon name="magic" size={20} /></div>
+        <div className="api-form-grid">
+          <label className="api-field-wide" htmlFor="tavern-api-model"><span>模型</span><input id="tavern-api-model" list="tavern-api-model-list" value={config.model} aria-invalid={Boolean(errors.model)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, model: event.target.value }))} /><datalist id="tavern-api-model-list">{availableModels.map((model) => <option key={model} value={model} />)}</datalist></label>
+          {errors.model && <small className="api-field-error api-field-wide" role="alert">{errors.model}</small>}
+          <label htmlFor="tavern-api-temperature"><span>温度 · {config.temperature.toFixed(1)}</span><input id="tavern-api-temperature" type="number" min="0" max="2" step="0.1" value={config.temperature} aria-invalid={Boolean(errors.temperature)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, temperature: Number(event.target.value) }))} /></label>
+          <label htmlFor="tavern-api-max-tokens"><span>最大输出 Token</span><input id="tavern-api-max-tokens" type="number" min="64" max="8192" step="64" value={config.maxTokens} aria-invalid={Boolean(errors.maxTokens)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, maxTokens: Number(event.target.value) }))} /></label>
+          {errors.temperature && <small className="api-field-error" role="alert">{errors.temperature}</small>}
+          {errors.maxTokens && <small className="api-field-error" role="alert">{errors.maxTokens}</small>}
+        </div>
+      </article>
+
+      <article className="api-flow-card">
+        <span className="panel-kicker">请求编排</span><h4>角色卡 → 世界书 → 模型 → 六标签</h4>
+        <ol><li><b>01</b><span>收集当前 NPC、好感、游戏变量与最近会话</span></li><li><b>02</b><span>扫描世界书并请求所选模型生成中文回应</span></li><li><b>03</b><span>解析正文、选项、摘要与变量并保存到本机</span></li></ol>
+      </article>
+
+      <div className={`api-feedback is-${feedback.tone}`} role={feedback.tone === 'error' ? 'alert' : 'status'} aria-live="polite">
+        <GameIcon name={feedback.tone === 'error' ? 'warning' : feedback.tone === 'success' ? 'success' : 'connect'} size={18} />
+        <div><strong>{feedback.message}</strong><small>{availableModels.length ? `已读取：${availableModels.slice(0, 3).join('、')}${availableModels.length > 3 ? ' 等' : ''}` : '测试连接只验证当前配置，不会发送任何 NPC 对话。'}</small></div>
+      </div>
+
+      <footer className="api-actions">
+        <button id="tavern-api-test" className="secondary-button" type="button" disabled={feedback.tone === 'testing' || saving} onClick={() => void testConnection()}><GameIcon name="connect" size={17} />{feedback.tone === 'testing' ? '正在测试' : '测试连接'}</button>
+        <button id="tavern-api-save" className="primary-button" type="submit" disabled={saving || feedback.tone === 'testing'}><GameIcon name="save" size={17} />{saving ? '正在保存' : '保存接口配置'}</button>
+      </footer>
+    </form>
   </section>
 }

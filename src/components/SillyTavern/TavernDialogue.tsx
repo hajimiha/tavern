@@ -57,7 +57,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     setError(null)
     setInput('')
     try {
-      const next = await tavern.sendLocalTurn({
+      const next = await tavern.sendTurn({
         sessionId: session.id,
         npcId: npc.id,
         playerText: message,
@@ -75,7 +75,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
       setSessionSnapshot(next)
     } catch (caught) {
       if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
-        setError(caught instanceof Error ? caught.message : '本地叙事生成失败')
+        setError(caught instanceof Error ? caught.message : '叙事生成失败，请检查接口设置。')
       }
     } finally {
       setWorking(false)
@@ -105,7 +105,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     <section className="dialogue-view tavern-dialogue" role="dialog" aria-modal="false" aria-labelledby={`tavern-dialogue-title-${npc.id}`}>
       <header>
         <div>
-          <span>LOCAL TAVERN · 好感 {relationship.affinity}</span>
+          <span>{tavern.settings?.adapterMode === 'remote' ? 'REMOTE TAVERN' : 'LOCAL TAVERN'} · 好感 {relationship.affinity}</span>
           <h2 id={`tavern-dialogue-title-${npc.id}`}>与{npc.name}的酒馆会话</h2>
         </div>
         <div className="tavern-dialogue-header-actions">
@@ -116,7 +116,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
 
       <div className="tavern-status-ribbon">
         <span className="tavern-status-dot" aria-hidden="true" />
-        <strong>接口已预留 · 当前使用本地叙事</strong>
+        <strong>{tavern.apiLabel}</strong>
         <small>{tavern.status === 'loading' ? '正在载入角色记忆' : `${activeLorebooks.length} 册世界书已挂载`}</small>
       </div>
 
@@ -135,7 +135,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
             {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
           </article>
         ))}
-        {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span><p><i className="typing-caret" aria-label="正在组织回应" /> 正在结合角色卡与本地记忆……</p></article>}
+        {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span><p><i className="typing-caret" aria-label="正在组织回应" /> {tavern.settings?.adapterMode === 'remote' ? '模型正在读取角色卡与世界书……' : '正在结合角色卡与本地记忆……'}</p></article>}
       </div>
 
       <div className="tavern-options" aria-label="本回合可选行动">
@@ -152,7 +152,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         <label htmlFor={`dialogue-input-${npc.id}`}>自由输入</label>
         <textarea id={`dialogue-input-${npc.id}`} value={input} maxLength={220} rows={2} disabled={working || !session} placeholder="描述你的选择、问题或此刻的心情……" onChange={(event) => setInput(event.target.value)} />
         <div>
-          <small>{input.length} / 220 · 只在本机生成并保存</small>
+          <small>{input.length} / 220 · {tavern.settings?.adapterMode === 'remote' ? '消息将发送到已配置的模型服务' : '只在本机生成并保存'}</small>
           {working
             ? <button id={`dialogue-stop-${npc.id}`} className="secondary-button" type="button" onClick={() => abortRef.current?.abort()}><GameIcon name="stop" size={16} />停止生成</button>
             : <button id={`dialogue-send-${npc.id}`} className="primary-button" type="submit" disabled={!input.trim() || !session}><GameIcon name="send" size={16} />送出话语</button>}

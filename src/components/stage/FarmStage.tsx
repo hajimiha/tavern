@@ -27,6 +27,7 @@ export function FarmStage() {
     ? state.plots.find((plot) => plot.id === state.selectedPlotId)
     : undefined
   const selectedCrop = crops.find((crop) => crop.id === selected?.cropId)
+  const matureCount = state.plots.filter((plot) => plot.ready).length
   const fertilizerCount = state.inventory['moss-fertilizer'] ?? 0
   const close = () => dispatch({ type: 'CLOSE_MODAL' })
 
@@ -42,13 +43,13 @@ export function FarmStage() {
       <div className="farm-vignette" aria-hidden="true" />
       <div className="stage-atmosphere" aria-hidden="true"><i /><i /><i /></div>
       <header className="stage-titlebar">
-        <div><p className="eyebrow">SOUTH FIELD · 第六日</p><h1 id="stage-title">南坡田区</h1></div>
-        <span className="weather-pill">薄雾 · 土壤湿润</span>
+        <div><p className="eyebrow">SOUTH FIELD · 第{state.day}日</p><h1 id="stage-title">南坡田区</h1></div>
+        <span className="weather-pill">{state.weather} · {state.plots.some((plot) => plot.watered) ? '土壤湿润' : '等待开垦'}</span>
       </header>
 
       <div className="farm-stage-copy">
-        <span>秋 · 成熟作物 4</span>
-        <strong>暮光落进田垄，作物正等待你的手。</strong>
+        <span>{state.season} · 成熟作物 {matureCount}</span>
+        <strong>{state.plots.some((plot) => plot.cropId) ? '田垄已有新芽，今天的劳作正等待你的安排。' : '刚接手的田地还很安静，从第一包种子开始吧。'}</strong>
       </div>
 
       <div className="farm-grid" aria-label="四行六列农田">

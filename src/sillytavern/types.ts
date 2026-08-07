@@ -180,7 +180,7 @@ export interface ChatMessage {
   }
   parsed?: ParsedTags
   variablesAfter?: Record<string, unknown>
-  apiUsed?: 'local' | 'disabled'
+  apiUsed?: 'local' | 'remote'
 }
 
 export interface ChatSession {
@@ -225,9 +225,22 @@ export interface MistvaleTavernDefaults {
   settings: TavernSettings
 }
 
+export type TavernApiProvider = 'deepseek' | 'openai-compatible'
+
+export interface TavernApiConfig {
+  provider: TavernApiProvider
+  baseUrl: string
+  model: string
+  temperature: number
+  maxTokens: number
+  rememberKey: boolean
+  persistedApiKey?: string
+}
+
 export interface TavernSettings {
   key: 'mistvale-settings'
-  adapterMode: 'disabled'
+  adapterMode: 'local' | 'remote'
+  api: TavernApiConfig
   activePresetId: string | null
   activeLorebookIds: string[]
   activeCharacterId: string | null

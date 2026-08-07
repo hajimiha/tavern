@@ -11,7 +11,8 @@ describe('顶部游戏状态栏', () => {
 
     expect(screen.getByText('苔灯农场')).toBeVisible()
     expect(screen.getByText('5 / 5')).toBeVisible()
-    expect(screen.getByText('2,480')).toBeVisible()
+    expect(screen.getByText('500')).toBeVisible()
+    expect(screen.getByText('春 · 第 1 日')).toBeVisible()
     expect(screen.getAllByTestId(/^hud-skill-/)).toHaveLength(5)
   })
 

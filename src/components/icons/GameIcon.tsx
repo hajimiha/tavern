@@ -31,6 +31,12 @@ import {
   GitBranch,
   Trash,
   WarningCircle,
+  Eye,
+  EyeSlash,
+  PlugsConnected,
+  FloppyDisk,
+  CheckCircle,
+  ShieldCheck,
 } from '@phosphor-icons/react'
 
 const icons = {
@@ -66,6 +72,12 @@ const icons = {
   branch: GitBranch,
   trash: Trash,
   warning: WarningCircle,
+  reveal: Eye,
+  conceal: EyeSlash,
+  connect: PlugsConnected,
+  save: FloppyDisk,
+  success: CheckCircle,
+  shield: ShieldCheck,
 }
 
 export type GameIconName = keyof typeof icons

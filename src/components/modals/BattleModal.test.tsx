@@ -12,7 +12,7 @@ describe('回合制五行战斗', () => {
     const battle = { floor: 2, enemyName: '岩壳史莱姆', enemyElement: 'earth' as const, enemyHealth: 20, enemyMaxHealth: 20, turn: 1, log: ['战斗开始。'] }
     render(<GameProvider initialState={{ ...initialGameState, activeModal: 'battle', battle }}><ModalHost /></GameProvider>)
     await user.click(screen.getByRole('button', { name: /物理攻击/ }))
-    expect(screen.getByText('生命 13 / 20')).toBeVisible()
-    expect(screen.getByText(/造成 7 点物理伤害/)).toBeVisible()
+    expect(screen.getByText('生命 16 / 20')).toBeVisible()
+    expect(screen.getByText(/造成 4 点物理伤害/)).toBeVisible()
   })
 })

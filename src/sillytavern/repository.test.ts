@@ -27,7 +27,22 @@ describe('雾灯谷酒馆仓储', () => {
     await repository.initialize()
     expect((await repository.getCharacter(edited.id))?.personality).toBe('玩家自定义性格')
     expect(await repository.listLorebooks()).toHaveLength(2)
-    expect((await repository.getSettings()).adapterMode).toBe('disabled')
+    expect((await repository.getSettings()).adapterMode).toBe('local')
+    expect((await repository.getSettings()).api.model).toBe('deepseek-v4-flash')
+  })
+
+  it('读取旧版设置时补全 API 配置且不会凭空保存密钥', async () => {
+    database = createTavernDatabase(`mistvale-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const current = await database.settings.get('mistvale-settings')
+    await database.settings.put({ ...current!, adapterMode: 'disabled', api: undefined } as never)
+
+    const migrated = await repository.getSettings()
+
+    expect(migrated.adapterMode).toBe('local')
+    expect(migrated.api).toMatchObject({ provider: 'deepseek', model: 'deepseek-v4-flash' })
+    expect(migrated.api.persistedApiKey).toBeUndefined()
   })
 
   it('为世界书和会话提供对称的保存与删除操作', async () => {

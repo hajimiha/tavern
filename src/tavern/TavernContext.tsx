@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { createDisabledTavernApi } from '../sillytavern/api-adapter'
+import { createRemoteTavernApi } from '../sillytavern/api-adapter'
+import { resolveApiKey } from '../sillytavern/api-credentials'
 import { tavernRepository, type TavernRepository } from '../sillytavern/repository'
 import type {
   CharacterCard,
@@ -7,14 +8,16 @@ import type {
   ChatPreset,
   ChatSession,
   Lorebook,
+  ParsedTags,
   TavernSettings,
 } from '../sillytavern/types'
 import { branchChat, truncateChatAt } from '../sillytavern/variables'
 import { createLocalTurn } from './local-story-engine'
+import { createRemoteTurn } from './remote-story-engine'
 
 type TavernStatus = 'loading' | 'ready' | 'error'
 
-interface SendLocalTurnInput {
+interface SendTurnInput {
   sessionId: string
   npcId: string
   playerText: string
@@ -35,7 +38,7 @@ interface TavernContextValue {
   settings: TavernSettings | null
   activeSession: ChatSession | null
   openNpcSession(npcId: string, variables?: Record<string, unknown>): Promise<ChatSession>
-  sendLocalTurn(input: SendLocalTurnInput): Promise<ChatSession>
+  sendTurn(input: SendTurnInput): Promise<ChatSession>
   selectSession(id: string | null): Promise<void>
   updateSettings(patch: Partial<TavernSettings>): Promise<void>
   saveLorebook(value: Lorebook): Promise<void>
@@ -65,7 +68,6 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
   const [characters, setCharacters] = useState<CharacterCard[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [settings, setSettings] = useState<TavernSettings | null>(null)
-  const api = useMemo(() => createDisabledTavernApi(), [])
 
   useEffect(() => {
     let cancelled = false
@@ -100,7 +102,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     const current = settings ?? await repository.getSettings()
     const next = { ...current, ...patch, updatedAt: Date.now() }
     await repository.saveSettings(next)
-    setSettings(next)
+    setSettings(await repository.getSettings())
   }, [repository, settings])
 
   const saveSession = useCallback(async (value: ChatSession) => {
@@ -141,20 +143,53 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     return session
   }, [characters, sessions, settings, repository, persistSettings, saveSession])
 
-  const sendLocalTurn = useCallback(async (input: SendLocalTurnInput) => {
+  const sendTurn = useCallback(async (input: SendTurnInput) => {
     const session = sessions.find((candidate) => candidate.id === input.sessionId)
       ?? await repository.getSession(input.sessionId)
     if (!session) throw new Error('找不到当前酒馆会话')
     const variables = { ...session.variables, ...input.variables }
     const startedAt = performance.now()
-    const turn = await createLocalTurn({
-      npcId: input.npcId,
-      playerText: input.playerText,
-      variables,
-      affinity: input.affinity,
-      memoryTags: input.memoryTags,
-      signal: input.signal,
-    })
+    const currentSettings = settings ?? await repository.getSettings()
+    let turn: {
+      parsed: ParsedTags
+      variablesAfter: Record<string, unknown>
+      matchedEntryIds?: string[]
+    }
+    let apiUsed: 'local' | 'remote' = 'local'
+
+    if (currentSettings.adapterMode === 'remote') {
+      const character = characters.find((candidate) => candidate.npcId === input.npcId)
+        ?? (await repository.listCharacters()).find((candidate) => candidate.npcId === input.npcId)
+      if (!character) throw new Error(`找不到 NPC 角色卡：${input.npcId}`)
+      const preset = presets.find((candidate) => candidate.id === (session.presetId ?? currentSettings.activePresetId))
+        ?? (await repository.listPresets()).find((candidate) => candidate.id === (session.presetId ?? currentSettings.activePresetId))
+      if (!preset) throw new Error('尚未选择可用的酒馆提示词预设。')
+      const sessionLorebookIds = session.lorebookIds.length ? session.lorebookIds : currentSettings.activeLorebookIds
+      const activeLorebooks = lorebooks.filter((book) => sessionLorebookIds.includes(book.id))
+      const api = createRemoteTavernApi(currentSettings.api, resolveApiKey(currentSettings))
+      turn = await createRemoteTurn({
+        api,
+        playerText: input.playerText,
+        history: session.messages,
+        preset,
+        lorebooks: activeLorebooks,
+        character,
+        userName: session.userName,
+        variables,
+        formatPrompt: currentSettings.formatPromptTemplate,
+        signal: input.signal,
+      })
+      apiUsed = 'remote'
+    } else {
+      turn = await createLocalTurn({
+        npcId: input.npcId,
+        playerText: input.playerText,
+        variables,
+        affinity: input.affinity,
+        memoryTags: input.memoryTags,
+        signal: input.signal,
+      })
+    }
     const now = Date.now()
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -170,8 +205,11 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       timestamp: now + 1,
       parsed: turn.parsed,
       variablesAfter: turn.variablesAfter,
-      apiUsed: 'local',
-      metadata: { processingTime: Math.round(performance.now() - startedAt) },
+      apiUsed,
+      metadata: {
+        processingTime: Math.round(performance.now() - startedAt),
+        lorebookEntries: turn.matchedEntryIds,
+      },
     }
     const next = {
       ...session,
@@ -181,7 +219,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     }
     await saveSession(next)
     return next
-  }, [sessions, repository, saveSession])
+  }, [sessions, repository, settings, characters, presets, lorebooks, saveSession])
 
   const selectSession = useCallback(async (id: string | null) => {
     await persistSettings({ activeSessionId: id })
@@ -243,10 +281,13 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
   }, [sessions, repository, saveSession])
 
   const activeSession = sessions.find((session) => session.id === settings?.activeSessionId) ?? null
+  const apiLabel = settings?.adapterMode === 'remote'
+    ? `${settings.api.provider === 'deepseek' ? 'DeepSeek' : '兼容接口'} · ${settings.api.model}`
+    : '本地叙事 · 不发送网络请求'
   const value = useMemo<TavernContextValue>(() => ({
     status,
     error,
-    apiLabel: api.label,
+    apiLabel,
     lorebooks,
     presets,
     characters,
@@ -254,7 +295,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     settings,
     activeSession,
     openNpcSession,
-    sendLocalTurn,
+    sendTurn,
     selectSession,
     updateSettings: persistSettings,
     saveLorebook,
@@ -267,7 +308,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
     branchSession,
     truncateSession,
     updateVariables,
-  }), [status, error, api.label, lorebooks, presets, characters, sessions, settings, activeSession, openNpcSession, sendLocalTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, saveSession, deleteSession, branchSession, truncateSession, updateVariables])
+  }), [status, error, apiLabel, lorebooks, presets, characters, sessions, settings, activeSession, openNpcSession, sendTurn, selectSession, persistSettings, saveLorebook, deleteLorebook, savePreset, deletePreset, saveCharacter, saveSession, deleteSession, branchSession, truncateSession, updateVariables])
 
   return <TavernContext.Provider value={value}>{children}</TavernContext.Provider>
 }

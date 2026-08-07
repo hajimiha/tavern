@@ -194,7 +194,15 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
   const lorebooks = [createWorldRules(now), createVillageArchive(now)]
   const settings: TavernSettings = {
     key: 'mistvale-settings',
-    adapterMode: 'disabled',
+    adapterMode: 'local',
+    api: {
+      provider: 'deepseek',
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-v4-flash',
+      temperature: 0.8,
+      maxTokens: 1200,
+      rememberKey: false,
+    },
     activePresetId: presetId,
     activeLorebookIds: lorebooks.map((book) => book.id),
     activeCharacterId: null,

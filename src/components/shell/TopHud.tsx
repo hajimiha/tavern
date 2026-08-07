@@ -39,7 +39,7 @@ export function TopHud() {
       </div>
 
       <div className="hud-clock" aria-label={`第${state.day}日 ${state.weekday} ${formatTime(state.minutes)} ${state.weather}`}>
-        <span>秋 · 第 {state.day} 日</span>
+        <span>{state.season} · 第 {state.day} 日</span>
         <strong>{formatTime(state.minutes)}</strong>
         <span>{state.weekday} · {state.weather}</span>
       </div>

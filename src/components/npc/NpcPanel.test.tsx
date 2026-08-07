@@ -35,6 +35,6 @@ describe('NPC 关系与灵犀对话', () => {
 
     await user.click(screen.getByRole('button', { name: '与洛岚交谈' }))
     expect(screen.getByRole('dialog', { name: '与洛岚的酒馆会话' })).toBeVisible()
-    expect(screen.getByText(/当前使用本地叙事/)).toBeVisible()
+    expect(screen.getByText(/本地叙事 · 不发送网络请求/)).toBeVisible()
   })
 })

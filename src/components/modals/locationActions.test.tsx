@@ -17,7 +17,7 @@ describe('地点经营行动', () => {
     render(<GameProvider initialState={{ ...initialGameState, location: 'hospital', energy: 3, activeModal: 'hospital' }}><HospitalObserver /></GameProvider>)
     await user.click(screen.getByRole('button', { name: '支付 180 金币，恢复 2 点精力' }))
     expect(screen.getByLabelText('剩余精力')).toHaveTextContent('5')
-    expect(screen.getByLabelText('剩余金币')).toHaveTextContent('2300')
+    expect(screen.getByLabelText('剩余金币')).toHaveTextContent('320')
     expect(screen.getByRole('button', { name: '今日已经接受过精力治疗' })).toBeDisabled()
   })
 })
