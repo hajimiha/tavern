@@ -1,0 +1,80 @@
+import {
+  Backpack,
+  BookOpen,
+  Coins,
+  Fish,
+  GearSix,
+  Hammer,
+  Heart,
+  Leaf,
+  MapTrifold,
+  Sparkle,
+  Sword,
+  X,
+  ChatCircleDots,
+  Gift,
+  Storefront,
+  ClipboardText,
+  UserCircle,
+  UploadSimple,
+  PaperPlaneRight,
+  StopCircle,
+  CaretLeft,
+  CaretRight,
+  CaretUp,
+  CaretDown,
+  Crosshair,
+  ArrowsCounterClockwise,
+  BracketsCurly,
+  Brain,
+  ClockCounterClockwise,
+  GitBranch,
+  Trash,
+  WarningCircle,
+} from '@phosphor-icons/react'
+
+const icons = {
+  backpack: Backpack,
+  book: BookOpen,
+  coins: Coins,
+  fishing: Fish,
+  settings: GearSix,
+  health: Heart,
+  farming: Leaf,
+  map: MapTrifold,
+  mining: Hammer,
+  magic: Sparkle,
+  combat: Sword,
+  close: X,
+  chat: ChatCircleDots,
+  gift: Gift,
+  shop: Storefront,
+  quest: ClipboardText,
+  profile: UserCircle,
+  upload: UploadSimple,
+  send: PaperPlaneRight,
+  stop: StopCircle,
+  panLeft: CaretLeft,
+  panRight: CaretRight,
+  panUp: CaretUp,
+  panDown: CaretDown,
+  crosshair: Crosshair,
+  reset: ArrowsCounterClockwise,
+  variables: BracketsCurly,
+  memory: Brain,
+  history: ClockCounterClockwise,
+  branch: GitBranch,
+  trash: Trash,
+  warning: WarningCircle,
+}
+
+export type GameIconName = keyof typeof icons
+
+export function GameIcon({ name, size = 20, weight = 'regular' }: {
+  name: GameIconName
+  size?: number
+  weight?: 'regular' | 'bold' | 'duotone' | 'fill'
+}) {
+  const IconComponent = icons[name]
+  return <IconComponent aria-hidden="true" size={size} weight={weight} />
+}
