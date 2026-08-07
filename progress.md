@@ -93,6 +93,15 @@
   - 确认当前目录并非 Git 仓库，因此不创建提交、分支或 PR。
 
 ## Test Results
+
+## Session: 2026-08-08 · 持久游玩与仓库级内容生产
+### Phase 9 调查与设计
+- **Status:** in_progress
+- 已完整读取 SillyTavern、UI/UX Pro Max、系统化调试、TDD 与文件化计划规范。
+- 已恢复上一会话上下文；本轮范围锁定为 API 参数、农场热区、内容导入导出/仓库默认、会话滚动、全屏和自动存档。
+- 下一步：检查现有数据流和 DOM/CSS，建立失败测试并写入设计规格与实施计划。
+- 已确认 API 上限来自 UI `max=8192` 与 `validateTavernApiConfig` 双重硬编码；会话不可达来自七行网格与 `overflow:hidden` 的结构冲突。
+- 已确认农场从地图数据与组件列表两层被排除，刷新丢档则是 Provider 只持久化玩法规则而非完整游戏状态。
 | Test | Input | Expected | Actual | Status |
 |------|-------|----------|--------|--------|
 | 项目现状检查 | 文件、Git、AGENTS | 识别现有结构与约束 | 仅有空 outputs/work，非 Git 仓库，无 AGENTS | 通过 |
@@ -112,6 +121,7 @@
 | 2026-08-05 | Vite 配置加载器越界扫描受限目录 | 2 | 无导入配置仍失败，改用 Vitest 零配置 CLI 模式 |
 | 2026-08-06 | Phosphor `Pickaxe` 未导出导致 HUD 渲染失败 | 1 | 依据实际 index.d.ts 将挖矿图标替换为 `Hammer` |
 | 2026-08-06 | 组件测试 DOM 未在用例间自动清理 | 1 | 在 src/test/setup.ts 注册 afterEach(cleanup) |
+| 2026-08-08 | PowerShell 下 `rg src/**/*.test.ts*` 将 glob 作为非法文件名 | 1 | 改用 `rg --glob '*.test.ts*'` 或直接搜索 `src`，不再传 POSIX glob 路径 |
 | 2026-08-06 | TypeScript 报初始地块状态字段重复覆盖 | 1 | 将样本与默认值归一化为单一 plotState |
 
 ## 5-Question Reboot Check
