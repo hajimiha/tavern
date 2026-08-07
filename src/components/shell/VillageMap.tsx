@@ -38,6 +38,7 @@ export function VillageMap() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<DragState | null>(null)
   const suppressHotspotClickRef = useRef(false)
+  const suppressClickTimerRef = useRef<number | null>(null)
   const frameRef = useRef<number | null>(null)
   const pendingOffsetRef = useRef<MapPoint | null>(null)
   const mapLocations = locations.filter((location) => location.id !== 'farm')
@@ -101,6 +102,7 @@ export function VillageMap() {
 
   useEffect(() => () => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current)
+    if (suppressClickTimerRef.current !== null) window.clearTimeout(suppressClickTimerRef.current)
   }, [])
 
   const panMap = (deltaX: number, deltaY: number) => {
@@ -132,6 +134,9 @@ export function VillageMap() {
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
+    if (suppressClickTimerRef.current !== null) window.clearTimeout(suppressClickTimerRef.current)
+    suppressClickTimerRef.current = null
+    suppressHotspotClickRef.current = false
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -156,6 +161,12 @@ export function VillageMap() {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
     suppressHotspotClickRef.current = drag.moved
+    if (drag.moved) {
+      suppressClickTimerRef.current = window.setTimeout(() => {
+        suppressHotspotClickRef.current = false
+        suppressClickTimerRef.current = null
+      }, 0)
+    }
     dragRef.current = null
     event.currentTarget.releasePointerCapture?.(event.pointerId)
     setIsDragging(false)
@@ -235,11 +246,7 @@ export function VillageMap() {
         </div>
 
         <div className="map-controls" aria-label="地图视野控制">
-          <button id="map-pan-up" className="map-control-up" type="button" aria-label="向上移动地图" onClick={() => panMap(0, -PAN_STEP)}><GameIcon name="panUp" size={16} weight="bold" /></button>
-          <button id="map-pan-left" className="map-control-left" type="button" aria-label="向左移动地图" onClick={() => panMap(-PAN_STEP, 0)}><GameIcon name="panLeft" size={16} weight="bold" /></button>
           <button id="map-center-current" className="map-control-center" type="button" aria-label="定位当前地点" onClick={() => centerLocation(currentLocation)}><GameIcon name="crosshair" size={16} weight="duotone" /></button>
-          <button id="map-pan-right" className="map-control-right" type="button" aria-label="向右移动地图" onClick={() => panMap(PAN_STEP, 0)}><GameIcon name="panRight" size={16} weight="bold" /></button>
-          <button id="map-pan-down" className="map-control-down" type="button" aria-label="向下移动地图" onClick={() => panMap(0, PAN_STEP)}><GameIcon name="panDown" size={16} weight="bold" /></button>
           <button id="map-reset-view" className="map-control-reset" type="button" aria-label="重置地图视野" onClick={resetView}><GameIcon name="reset" size={15} weight="duotone" /></button>
         </div>
       </div>

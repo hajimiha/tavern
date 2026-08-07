@@ -90,16 +90,12 @@ export const spells: Spell[] = [
 ]
 
 export const createInitialPlots = (): Plot[] => Array.from({ length: 24 }, (_, index) => {
-  const sample = [
-    { cropId:'moon-radish', remainingHours:32, watered:false, fertilized:false, ready:false },
-    { cropId:'sun-wheat', remainingHours:0, watered:true, fertilized:true, ready:true },
-    { cropId:'mist-bean', remainingHours:54, watered:false, fertilized:false, ready:false },
-  ][index % 7]
-  const plotState = sample ?? { watered:false, fertilized:false, ready:false }
   return {
     id:`plot-${Math.floor(index / 6) + 1}-${(index % 6) + 1}`,
     row:Math.floor(index / 6) + 1,
     column:(index % 6) + 1,
-    ...plotState,
+    watered:false,
+    fertilized:false,
+    ready:false,
   }
 })
