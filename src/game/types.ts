@@ -230,5 +230,6 @@ export type GameAction =
   | { type: 'PLAYER_DEFEATED' }
   | { type: 'UPDATE_GAME_RULES'; rules: Partial<GameRuleSettings> }
   | { type: 'RESET_GAME_RULES' }
+  | { type: 'REPLACE_GAME_STATE'; state: GameState }
 
-export interface GameProviderProps { children: ReactNode; initialState?: GameState }
+export interface GameProviderProps { children: ReactNode; initialState?: GameState; storage?: Storage | null }

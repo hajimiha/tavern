@@ -35,6 +35,7 @@ describe('远程酒馆剧情引擎', () => {
       '<vars>{"lastTopic":"委托"}</vars>',
     ].join('')
     const { adapter, prepare } = createAdapter(response)
+    const streamed: string[] = []
 
     const result = await createRemoteTurn({
       api: adapter,
@@ -46,12 +47,15 @@ describe('远程酒馆剧情引擎', () => {
       userName: '旅行者',
       variables: { affinity: 0, money: 500 },
       formatPrompt: defaults.settings.formatPromptTemplate,
+      onDelta: (raw) => streamed.push(raw),
     })
 
     expect(result.parsed.maintext).toBe('洛岚把今日的委托簿推到你面前。')
     expect(result.parsed.options).toEqual(['查看委托详情', '询问村庄近况'])
     expect(result.variablesAfter).toMatchObject({ affinity: 0, money: 500, lastTopic: '委托' })
     expect(result.matchedEntryIds.length).toBeGreaterThan(0)
+    expect(streamed).toHaveLength(2)
+    expect(streamed.at(-1)).toBe(response)
     expect(prepare).toHaveBeenCalledWith(expect.objectContaining({
       task: 'story',
       messages: expect.arrayContaining([

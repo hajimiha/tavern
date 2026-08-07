@@ -10,6 +10,7 @@ import { GameIcon } from '../../icons/GameIcon'
 
 type Feedback = { tone: 'idle' | 'testing' | 'success' | 'error'; message: string }
 type FormErrors = TavernApiFieldErrors & { apiKey?: string }
+type PenaltyField = 'frequencyPenalty' | 'presencePenalty'
 
 const defaultSettings = createMistvaleDefaults().settings
 const providerGroups: Array<{ id: TavernProviderGroup; label: string }> = [
@@ -33,10 +34,15 @@ export function ApiPanel() {
   const [feedback, setFeedback] = useState<Feedback>({ tone: 'idle', message: '尚未测试当前连接。' })
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [penaltyDrafts, setPenaltyDrafts] = useState<Record<PenaltyField, string>>({ frequencyPenalty: '0', presencePenalty: '0' })
 
   useEffect(() => {
     if (!tavern.settings) return
     setConfig({ ...tavern.settings.api })
+    setPenaltyDrafts({
+      frequencyPenalty: String(tavern.settings.api.frequencyPenalty),
+      presencePenalty: String(tavern.settings.api.presencePenalty),
+    })
     setApiKey(getSessionApiKey() || (tavern.settings.api.rememberKey ? tavern.settings.api.persistedApiKey ?? '' : ''))
   }, [tavern.settings])
 
@@ -63,6 +69,19 @@ export function ApiPanel() {
       ...current,
       providerOptions: { ...current.providerOptions, [key]: value },
     }))
+  }
+
+  const changePenalty = (key: PenaltyField, raw: string) => {
+    setPenaltyDrafts((current) => ({ ...current, [key]: raw }))
+    const value = Number(raw)
+    if (raw.trim() && Number.isFinite(value) && value >= -2 && value <= 2) {
+      setConfig((current) => ({ ...current, [key]: value }))
+    }
+  }
+
+  const normalizePenaltyDraft = (key: PenaltyField) => {
+    setPenaltyDrafts((current) => ({ ...current, [key]: String(config[key]) }))
+    validate(false)
   }
 
   const save = async (event: FormEvent) => {
@@ -132,7 +151,7 @@ export function ApiPanel() {
         <div className="api-form-grid">
           <label className="api-field-wide" htmlFor="tavern-api-provider"><span>聊天补全来源</span><select id="tavern-api-provider" value={config.provider} onChange={(event) => changeProvider(event.target.value as TavernApiProvider)}>{providerGroups.map((group) => <optgroup key={group.id} label={group.label}>{TAVERN_PROVIDERS.filter((item) => item.group === group.id).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</optgroup>)}</select></label>
           <div className="api-provider-meta api-field-wide"><div><strong>{provider.label}</strong><span>{provider.note}</span></div><a href={provider.docsUrl} target="_blank" rel="noreferrer" aria-label={`查看 ${provider.label} 官方文档`}>官方文档</a></div>
-          <label className="api-field-wide" htmlFor="tavern-api-base-url"><span>接口根地址</span><div className="api-url-row"><input id="tavern-api-base-url" type="url" value={config.baseUrl} aria-invalid={Boolean(errors.baseUrl)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, baseUrl: event.target.value }))} /><button id="tavern-api-reset-base-url" type="button" onClick={() => setConfig((current) => ({ ...current, baseUrl: getTavernApiPreset(current.provider).baseUrl }))}>恢复官方地址</button></div></label>
+          <label className="api-field-wide" htmlFor="tavern-api-base-url"><span>接口根地址</span><input id="tavern-api-base-url" type="url" value={config.baseUrl} aria-invalid={Boolean(errors.baseUrl)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, baseUrl: event.target.value }))} /></label>
           {errors.baseUrl && <small className="api-field-error api-field-wide" role="alert">{errors.baseUrl}</small>}
           {provider.requiredOptions.length > 0 && <div className="api-provider-options api-field-wide">{provider.requiredOptions.map((key) => { const meta = providerOptionMeta[key]; return <label key={key} htmlFor={meta.id}><span>{meta.label}</span><input id={meta.id} value={config.providerOptions[key] ?? ''} placeholder={meta.placeholder} aria-invalid={Boolean(errors[key])} onBlur={() => validate(false)} onChange={(event) => changeProviderOption(key, event.target.value)} />{errors[key] && <small className="api-field-error" role="alert">{errors[key]}</small>}</label> })}</div>}
         </div>
@@ -152,10 +171,15 @@ export function ApiPanel() {
         <div className="api-form-grid">
           <label className="api-field-wide" htmlFor="tavern-api-model"><span>模型</span><input id="tavern-api-model" list="tavern-api-model-list" value={config.model} aria-invalid={Boolean(errors.model)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, model: event.target.value }))} /><datalist id="tavern-api-model-list">{availableModels.map((model) => <option key={model} value={model} />)}</datalist></label>
           {errors.model && <small className="api-field-error api-field-wide" role="alert">{errors.model}</small>}
-          <label htmlFor="tavern-api-temperature"><span>温度 · {config.temperature.toFixed(1)}</span><input id="tavern-api-temperature" type="number" min="0" max="2" step="0.1" value={config.temperature} aria-invalid={Boolean(errors.temperature)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, temperature: Number(event.target.value) }))} /></label>
-          <label htmlFor="tavern-api-max-tokens"><span>最大输出 Token</span><input id="tavern-api-max-tokens" type="number" min="64" max="8192" step="64" value={config.maxTokens} aria-invalid={Boolean(errors.maxTokens)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, maxTokens: Number(event.target.value) }))} /></label>
-          {errors.temperature && <small className="api-field-error" role="alert">{errors.temperature}</small>}
-          {errors.maxTokens && <small className="api-field-error" role="alert">{errors.maxTokens}</small>}
+          <label htmlFor="tavern-api-context-length"><span>上下文长度（以词符数计）</span><input id="tavern-api-context-length" type="number" inputMode="numeric" min="128" step="128" value={config.contextLength} aria-invalid={Boolean(errors.contextLength)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, contextLength: Number(event.target.value) }))} /></label>
+          <label htmlFor="tavern-api-response-length"><span>最大回复长度（以词符数计）</span><input id="tavern-api-response-length" type="number" inputMode="numeric" min="1" step="1" value={config.maxResponseLength} aria-invalid={Boolean(errors.maxResponseLength)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, maxResponseLength: Number(event.target.value) }))} /></label>
+          <label className="api-toggle-field api-field-wide" htmlFor="tavern-api-streaming"><input id="tavern-api-streaming" type="checkbox" aria-label="流式传输" checked={config.streaming} onChange={(event) => setConfig((current) => ({ ...current, streaming: event.target.checked }))} /><span><strong>流式传输</strong><small>模型生成时逐段显示正文；关闭后等待完整回复。</small></span></label>
+          <label htmlFor="tavern-api-temperature"><span>温度 · {config.temperature.toFixed(2)}</span><input id="tavern-api-temperature" type="number" inputMode="decimal" min="0" max="2" step="0.05" value={config.temperature} aria-invalid={Boolean(errors.temperature)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, temperature: Number(event.target.value) }))} /></label>
+          <label htmlFor="tavern-api-frequency-penalty"><span>频率惩罚 · {config.frequencyPenalty.toFixed(2)}</span><input id="tavern-api-frequency-penalty" type="number" inputMode="decimal" min="-2" max="2" step="0.05" value={penaltyDrafts.frequencyPenalty} aria-invalid={Boolean(errors.frequencyPenalty)} onBlur={() => normalizePenaltyDraft('frequencyPenalty')} onChange={(event) => changePenalty('frequencyPenalty', event.target.value)} /></label>
+          <label htmlFor="tavern-api-presence-penalty"><span>存在惩罚 · {config.presencePenalty.toFixed(2)}</span><input id="tavern-api-presence-penalty" type="number" inputMode="decimal" min="-2" max="2" step="0.05" value={penaltyDrafts.presencePenalty} aria-invalid={Boolean(errors.presencePenalty)} onBlur={() => normalizePenaltyDraft('presencePenalty')} onChange={(event) => changePenalty('presencePenalty', event.target.value)} /></label>
+          <label htmlFor="tavern-api-top-p"><span>Top P · {config.topP.toFixed(2)}</span><input id="tavern-api-top-p" type="number" inputMode="decimal" min="0" max="1" step="0.05" value={config.topP} aria-invalid={Boolean(errors.topP)} onBlur={() => validate(false)} onChange={(event) => setConfig((current) => ({ ...current, topP: Number(event.target.value) }))} /></label>
+          <small className="api-parameter-note api-field-wide">上下文长度用于客户端裁剪历史；部分专用协议会忽略其不支持的惩罚参数。</small>
+          {Object.entries(errors).filter(([key]) => ['contextLength', 'maxResponseLength', 'temperature', 'frequencyPenalty', 'presencePenalty', 'topP'].includes(key)).map(([key, message]) => <small key={key} className="api-field-error api-field-wide" role="alert">{message}</small>)}
         </div>
       </article>
 

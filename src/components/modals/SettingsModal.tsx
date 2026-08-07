@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ChangeEvent } from 'react'
 import { useGame } from '../../game/GameContext'
 import {
   DEFAULT_GAME_RULES,
@@ -60,10 +60,11 @@ function createMultiplierDrafts(rules: GameRuleSettings): MultiplierDrafts {
 }
 
 export function SettingsModal() {
-  const { state, dispatch } = useGame()
+  const { state, dispatch, saveMeta, exportGameSave, importGameSave, resetGameSave } = useGame()
   const [draft, setDraft] = useState<GameRuleSettings>(() => ({ ...state.rules }))
   const [multiplierDrafts, setMultiplierDrafts] = useState<MultiplierDrafts>(() => createMultiplierDrafts(state.rules))
   const [pendingReset, setPendingReset] = useState(false)
+  const [pendingNewGame, setPendingNewGame] = useState(false)
   const [status, setStatus] = useState('')
   const dirty = JSON.stringify(draft) !== JSON.stringify(state.rules)
   const profile = useMemo(() => {
@@ -108,6 +109,30 @@ export function SettingsModal() {
     setStatus('已恢复标准规则')
   }
 
+  const exportSave = () => {
+    const blob = new Blob([exportGameSave()], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `雾灯谷存档-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    setStatus('游戏存档已导出')
+  }
+
+  const importSave = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    const ok = importGameSave(await file.text())
+    setStatus(ok ? '游戏存档已导入' : '存档文件无法识别')
+  }
+
+  const confirmNewGame = () => {
+    resetGameSave()
+    setPendingNewGame(false)
+  }
+
   return <div className="settings-console">
     <section className="settings-overview" aria-label="当前难度倾向">
       <div className="settings-overview-mark" aria-hidden="true"><GameIcon name="settings" size={28} weight="duotone" /></div>
@@ -136,7 +161,18 @@ export function SettingsModal() {
       </section>)}
     </div>
 
+    <section className="settings-save-console" aria-label="自动存档管理">
+      <div className="settings-save-copy"><span>AUTOSAVE ARCHIVE</span><h4>自动存档</h4><p>地点、时间、背包、农田、关系与探索进度会在每次行动后保存在当前浏览器。</p></div>
+      <div className="settings-save-state"><i aria-hidden="true" /><span>{saveMeta.enabled ? '自动保存已开启' : '测试/预览状态'}</span><strong>{saveMeta.savedAt ? new Date(saveMeta.savedAt).toLocaleString('zh-CN') : '等待首次行动'}</strong></div>
+      <div className="settings-save-actions">
+        <button id="settings-save-export" type="button" aria-label="导出游戏存档" onClick={exportSave}><GameIcon name="save" size={17} />导出存档</button>
+        <label id="settings-save-import-label" htmlFor="settings-save-import"><GameIcon name="upload" size={17} />导入存档<input id="settings-save-import" type="file" accept=".json,application/json" aria-label="导入游戏存档" onChange={(event) => void importSave(event)} /></label>
+        <button id="settings-save-new" className="danger-ghost" type="button" aria-label="新建游戏存档" onClick={() => setPendingNewGame(true)}><GameIcon name="reset" size={17} />新建游戏</button>
+      </div>
+    </section>
+
     {pendingReset && <section className="settings-reset-confirm" role="alert"><GameIcon name="warning" size={20} /><div><strong>确认恢复全部标准规则？</strong><p>八项倍率将回到 1.00，精力消耗恢复为标准模式。</p></div><button id="settings-reset-cancel" type="button" onClick={() => setPendingReset(false)}>取消</button><button id="settings-reset-confirm" className="danger-button" type="button" onClick={confirmReset}>确认恢复</button></section>}
+    {pendingNewGame && <section className="settings-reset-confirm" role="alert"><GameIcon name="warning" size={20} /><div><strong>确认清除当前游戏进度？</strong><p>这会回到春季第 1 天的苔灯农场；建议先导出存档备份。</p></div><button id="settings-save-new-cancel" type="button" aria-label="取消新建存档" onClick={() => setPendingNewGame(false)}>取消</button><button id="settings-save-new-confirm" className="danger-button" type="button" aria-label="确认新建存档" onClick={confirmNewGame}>清除并新建</button></section>}
 
     <footer className="settings-actions">
       <div><span className={dirty ? 'settings-dirty-dot is-dirty' : 'settings-dirty-dot'} aria-hidden="true" /><p>{status || (dirty ? '有尚未应用的规则修改' : '当前规则已同步')}</p></div>

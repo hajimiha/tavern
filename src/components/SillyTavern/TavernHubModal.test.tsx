@@ -38,7 +38,17 @@ describe('酒馆中枢', () => {
     expect(screen.getByText('LLM API REQUIRED')).toBeVisible()
     expect(screen.queryByText(/LLM LOCAL|本地叙事/)).not.toBeInTheDocument()
 
+    await user.click(screen.getByRole('tab', { name: '世界书' }))
+    expect(await screen.findByRole('button', { name: '导入世界书' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '导出当前世界书' })).toBeVisible()
+
+    await user.click(screen.getByRole('tab', { name: '预设' }))
+    expect(await screen.findByRole('button', { name: '导入预设' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '导出当前预设' })).toBeVisible()
+
     await user.click(screen.getByRole('tab', { name: '角色卡' }))
     await waitFor(() => expect(screen.getAllByRole('button', { name: /编辑角色卡/ })).toHaveLength(15))
+    expect(screen.getByRole('button', { name: '导出仓库内容包' })).toBeVisible()
+    expect(screen.getByText(/public\/content\/mistvale-content-pack\.json/)).toBeVisible()
   })
 })

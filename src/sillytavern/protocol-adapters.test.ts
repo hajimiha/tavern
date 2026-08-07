@@ -16,7 +16,12 @@ function config(provider: TavernApiProvider, patch: Partial<TavernApiConfig> = {
   return {
     ...getTavernApiPreset(provider),
     temperature: 0.7,
-    maxTokens: 512,
+    contextLength: 32000,
+    maxResponseLength: 512,
+    streaming: true,
+    frequencyPenalty: 0.25,
+    presencePenalty: -0.5,
+    topP: 0.85,
     rememberKey: false,
     providerOptions: {},
     ...patch,
@@ -28,7 +33,13 @@ describe('供应商协议适配', () => {
     const openai = buildProviderRequest(config('deepseek'), 'secret', request, true)
     expect(openai.url).toBe('https://api.deepseek.com/chat/completions')
     expect(openai.init.headers).toMatchObject({ Authorization: 'Bearer secret' })
-    expect(JSON.parse(openai.init.body as string)).toMatchObject({ stream: true, max_tokens: 512 })
+    expect(JSON.parse(openai.init.body as string)).toMatchObject({
+      stream: true,
+      max_tokens: 512,
+      frequency_penalty: 0.25,
+      presence_penalty: -0.5,
+      top_p: 0.85,
+    })
 
     const azure = buildProviderRequest(config('azure-openai', {
       baseUrl: 'https://mistvale.openai.azure.com/openai/v1',
@@ -44,7 +55,8 @@ describe('供应商协议适配', () => {
     const body = JSON.parse(built.init.body as string)
     expect(built.url).toBe('https://api.anthropic.com/v1/messages')
     expect(built.init.headers).toMatchObject({ 'x-api-key': 'claude-secret', 'anthropic-version': '2023-06-01' })
-    expect(body).toMatchObject({ system: '世界规则', stream: true, max_tokens: 512 })
+    expect(body).toMatchObject({ system: '世界规则', stream: true, max_tokens: 512, top_p: 0.85 })
+    expect(body).not.toHaveProperty('frequency_penalty')
     expect(body.messages).toEqual([
       { role: 'user', content: '早上好' },
       { role: 'assistant', content: '早安' },
@@ -59,6 +71,12 @@ describe('供应商协议适配', () => {
     expect(studio.url).toContain('/models/gemini-2.5-flash:streamGenerateContent?alt=sse')
     expect(studio.init.headers).toMatchObject({ 'x-goog-api-key': 'google-key' })
     expect(studioBody.systemInstruction.parts[0].text).toBe('世界规则')
+    expect(studioBody.generationConfig).toMatchObject({
+      maxOutputTokens: 512,
+      topP: 0.85,
+      frequencyPenalty: 0.25,
+      presencePenalty: -0.5,
+    })
     expect(studioBody.contents[1]).toEqual({ role: 'model', parts: [{ text: '早安' }] })
 
     const vertex = buildProviderRequest(config('google-vertex-ai', {

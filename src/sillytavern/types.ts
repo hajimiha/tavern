@@ -27,6 +27,8 @@ export interface TavernApiAdapter {
 
 export interface LorebookEntry {
   id: string
+  disabled?: boolean
+  excluded?: boolean
   keys: string[]
   secondaryKeys: string[]
   content: string
@@ -266,8 +268,13 @@ export interface TavernApiConfig {
   provider: TavernApiProvider
   baseUrl: string
   model: string
+  contextLength: number
+  maxResponseLength: number
+  streaming: boolean
   temperature: number
-  maxTokens: number
+  frequencyPenalty: number
+  presencePenalty: number
+  topP: number
   rememberKey: boolean
   providerOptions: Partial<Record<TavernProviderOptionKey, string>>
   persistedApiKey?: string
@@ -284,6 +291,7 @@ export interface TavernSettings {
   customTags: string[]
   formatPromptTemplate: string
   thinkingDisplay: 'fold' | 'hide' | 'inline'
+  contentPackVersion?: string
   updatedAt: number
 }
 

@@ -12,6 +12,15 @@ const openingOptions: Record<string, string[]> = {
   rin: ['请求战斗指导', '询问魔物踪迹', '暂时告辞'],
 }
 
+function extractStreamingMaintext(raw: string): string {
+  const marker = '<maintext>'
+  const start = raw.indexOf(marker)
+  if (start < 0) return ''
+  const content = raw.slice(start + marker.length)
+  const end = content.indexOf('</maintext>')
+  return (end >= 0 ? content.slice(0, end) : content).trimStart()
+}
+
 export function TavernDialogue({ npc }: { npc: Npc }) {
   const { state, dispatch } = useGame()
   const tavern = useTavern()
@@ -20,11 +29,13 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const [sessionSnapshot, setSessionSnapshot] = useState<ChatSession | null>(null)
   const [input, setInput] = useState('')
   const [working, setWorking] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const openingRef = useRef(false)
   const settlementRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (tavern.status !== 'ready' || openingRef.current) return
@@ -59,6 +70,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
     const controller = new AbortController()
     abortRef.current = controller
     setWorking(true)
+    setStreamingText('')
     setError(null)
     setInput('')
     try {
@@ -76,6 +88,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         affinity: relationship.affinity,
         memoryTags: relationship.memoryTags,
         signal: controller.signal,
+        onDelta: (raw) => setStreamingText(extractStreamingMaintext(raw)),
       })
       setSessionSnapshot(next)
       if (!settlementRef.current) {
@@ -89,6 +102,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
       setInput(message)
     } finally {
       setWorking(false)
+      setStreamingText('')
       abortRef.current = null
     }
   }
@@ -114,6 +128,12 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const readinessError = tavern.status === 'ready' && !tavern.apiReady ? tavern.apiReadinessError : null
   const displayedError = error ?? readinessError
 
+  useEffect(() => {
+    const scrollRegion = scrollRef.current
+    if (!scrollRegion) return
+    scrollRegion.scrollTop = scrollRegion.scrollHeight
+  }, [session?.messages.length, working, streamingText, options.length, displayedError])
+
   return (
     <section className="dialogue-view tavern-dialogue" role="dialog" aria-modal="false" aria-labelledby={`tavern-dialogue-title-${npc.id}`}>
       <header>
@@ -133,35 +153,37 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         <small>{tavern.status === 'loading' ? '正在载入角色记忆' : `${activeLorebooks.length} 册世界书已挂载`}</small>
       </div>
 
-      <div className="tavern-context-strip">
-        <div><GameIcon name="memory" size={16} /><span>她记得</span><p>{relationship.memoryTags.length ? relationship.memoryTags.join(' · ') : '今天的话会成为第一笔共同记忆。'}</p></div>
-        <div><GameIcon name="book" size={16} /><span>角色卡</span><p>{card ? `${card.role} · ${card.tags.slice(1).join(' · ')}` : '正在读取人物档案'}</p></div>
-        <div><GameIcon name="variables" size={16} /><span>变量镜像</span><p>金币 {state.money} · 精力 {state.energy} · 好感 {relationship.affinity}</p></div>
+      <div ref={scrollRef} className="tavern-dialogue-scroll" data-testid="tavern-dialogue-scroll" role="region" aria-label="酒馆会话记录">
+        <div className="tavern-context-strip">
+          <div><GameIcon name="memory" size={16} /><span>她记得</span><p>{relationship.memoryTags.length ? relationship.memoryTags.join(' · ') : '今天的话会成为第一笔共同记忆。'}</p></div>
+          <div><GameIcon name="book" size={16} /><span>角色卡</span><p>{card ? `${card.role} · ${card.tags.slice(1).join(' · ')}` : '正在读取人物档案'}</p></div>
+          <div><GameIcon name="variables" size={16} /><span>变量镜像</span><p>金币 {state.money} · 精力 {state.energy} · 好感 {relationship.affinity}</p></div>
+        </div>
+
+        <div className="dialogue-log" aria-live="polite" aria-busy={working}>
+          {!session && <div className="tavern-dialogue-skeleton"><i /><i /><i /></div>}
+          {session?.messages.map((message) => (
+            <article key={message.id} className={`dialogue-message is-${message.role === 'user' ? 'player' : 'npc'}`}>
+              <span>{message.role === 'assistant' ? npc.name : '你'}</span>
+              <p>{message.content}</p>
+              {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
+            </article>
+          ))}
+          {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span><p><i className="typing-caret" aria-label="正在组织回应" /> {streamingText || '模型正在读取角色卡与世界书……'}</p></article>}
+        </div>
+
+        <div className="tavern-options" aria-label="本回合可选行动">
+          {options.map((option, index) => (
+            <button id={`dialogue-option-${npc.id}-${index}`} key={`${option}-${index}`} type="button" aria-label={`选择行动：${option}`} disabled={working || !session || !tavern.apiReady} onClick={() => void send(option)}>
+              <span>{String(index + 1).padStart(2, '0')}</span>{option}<GameIcon name="send" size={15} />
+            </button>
+          ))}
+        </div>
+
+        {displayedError && <div className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={17} /><span>{displayedError}</span><button id={`dialogue-open-api-${npc.id}`} type="button" aria-label="打开接口设置" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'tavern' })}>打开接口设置</button></div>}
       </div>
 
-      <div className="dialogue-log" aria-live="polite" aria-busy={working}>
-        {!session && <div className="tavern-dialogue-skeleton"><i /><i /><i /></div>}
-        {session?.messages.map((message) => (
-          <article key={message.id} className={`dialogue-message is-${message.role === 'user' ? 'player' : 'npc'}`}>
-            <span>{message.role === 'assistant' ? npc.name : '你'}</span>
-            <p>{message.content}</p>
-            {message.parsed?.sum && <small className="dialogue-summary">楼层摘要 · {message.parsed.sum}</small>}
-          </article>
-        ))}
-        {working && <article className="dialogue-message is-npc is-working"><span>{npc.name}</span><p><i className="typing-caret" aria-label="正在组织回应" /> 模型正在读取角色卡与世界书……</p></article>}
-      </div>
-
-      <div className="tavern-options" aria-label="本回合可选行动">
-        {options.map((option, index) => (
-          <button id={`dialogue-option-${npc.id}-${index}`} key={`${option}-${index}`} type="button" aria-label={`选择行动：${option}`} disabled={working || !session || !tavern.apiReady} onClick={() => void send(option)}>
-            <span>{String(index + 1).padStart(2, '0')}</span>{option}<GameIcon name="send" size={15} />
-          </button>
-        ))}
-      </div>
-
-      {displayedError && <div className="tavern-dialogue-error" role="alert"><GameIcon name="warning" size={17} /><span>{displayedError}</span><button id={`dialogue-open-api-${npc.id}`} type="button" aria-label="打开接口设置" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: 'tavern' })}>打开接口设置</button></div>}
-
-      <form className="dialogue-composer tavern-composer" onSubmit={submit}>
+      <form className="dialogue-composer tavern-composer" aria-label="自由输入对话" onSubmit={submit}>
         <label htmlFor={`dialogue-input-${npc.id}`}>自由输入</label>
         <textarea id={`dialogue-input-${npc.id}`} value={input} maxLength={220} rows={2} disabled={working || !session || !tavern.apiReady} placeholder={tavern.apiReady ? '描述你的选择、问题或此刻的心情……' : '请先完成 API 接口配置'} onChange={(event) => setInput(event.target.value)} />
         <div>

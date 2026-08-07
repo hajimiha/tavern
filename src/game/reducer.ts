@@ -83,6 +83,8 @@ export const initialGameState: GameState = {
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
+    case 'REPLACE_GAME_STATE':
+      return action.state
     case 'UPDATE_GAME_RULES':
       return { ...state, rules: normalizeGameRules({ ...state.rules, ...action.rules }) }
     case 'RESET_GAME_RULES':

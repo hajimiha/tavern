@@ -97,4 +97,32 @@ describe('酒馆 API 控制台', () => {
 
     expect(await screen.findByText(/请填写 Account ID/)).toHaveAttribute('role', 'alert')
   })
+
+  it('展示完整生成参数并取消最大回复长度上限与地址重置按钮', async () => {
+    database = createTavernDatabase(`mistvale-api-parameters-${crypto.randomUUID()}`)
+    render(<TavernProvider repository={createTavernRepository(database)}><ApiPanel /></TavernProvider>)
+
+    expect(await screen.findByLabelText('上下文长度（以词符数计）')).toHaveAttribute('inputmode', 'numeric')
+    const responseLength = screen.getByLabelText('最大回复长度（以词符数计）')
+    expect(responseLength).not.toHaveAttribute('max')
+    expect(screen.getByLabelText('流式传输')).toBeChecked()
+    expect(screen.getByLabelText(/温度/)).toBeVisible()
+    expect(screen.getByLabelText(/频率惩罚/)).toBeVisible()
+    expect(screen.getByLabelText(/存在惩罚/)).toBeVisible()
+    expect(screen.getByLabelText(/Top P/)).toBeVisible()
+    expect(screen.queryByRole('button', { name: '恢复官方地址' })).not.toBeInTheDocument()
+  })
+
+  it('允许用键盘逐字输入负数惩罚参数', async () => {
+    const user = userEvent.setup()
+    database = createTavernDatabase(`mistvale-api-negative-${crypto.randomUUID()}`)
+    render(<TavernProvider repository={createTavernRepository(database)}><ApiPanel /></TavernProvider>)
+
+    const input = await screen.findByLabelText(/频率惩罚/)
+    await user.clear(input)
+    await user.type(input, '-0.5')
+
+    expect(input).toHaveValue(-0.5)
+    expect(screen.getByText('频率惩罚 · -0.50')).toBeVisible()
+  })
 })

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { createDefaultEntry, createDefaultLorebook, removeEntry, updateEntry } from '../../../sillytavern/editor-utils'
+import { exportLorebook, exportToJson, importLorebook } from '../../../sillytavern/importer'
 import type { Lorebook, LorebookEntry } from '../../../sillytavern/types'
 import { useTavern } from '../../../tavern/TavernContext'
 import { GameIcon } from '../../icons/GameIcon'
@@ -62,9 +63,31 @@ export function LorebookPanel() {
     const next = active.has(bookId) ? [...active].filter((id) => id !== bookId) : [...active, bookId]
     await tavern.updateSettings({ activeLorebookIds: next })
   }
+  const importBook = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const imported = importLorebook(JSON.parse(await file.text()))
+      const now = Date.now()
+      const next: Lorebook = { ...imported, id: crypto.randomUUID(), createdAt: now, updatedAt: now }
+      await tavern.saveLorebook(next)
+      setSelectedId(next.id)
+      setDraft(next)
+      setEntryId(next.entries[0]?.id ?? null)
+      setNotice(`已导入世界书“${next.name}”`)
+    } catch {
+      setNotice('导入失败：请选择有效的 SillyTavern 世界书 JSON。')
+    }
+  }
+  const exportBook = () => {
+    if (!draft) return
+    exportToJson(exportLorebook(draft), `${draft.name || '世界书'}.json`)
+    setNotice(`已导出“${draft.name}”`)
+  }
 
   return <section className="tavern-panel lorebook-panel" aria-labelledby="lorebook-panel-title">
-    <header className="tavern-panel-heading"><div><span>WORLD INFORMATION</span><h3 id="lorebook-panel-title">世界书</h3><p>关键词触发、递归扫描与注入位置均兼容 SillyTavern 数据结构。</p></div><div className="panel-heading-actions"><button id="lorebook-create" type="button" onClick={create}><GameIcon name="book" size={17} />新建世界书</button><button id="lorebook-save" className="primary-button" type="button" disabled={!dirty} onClick={() => void save()}><GameIcon name="upload" size={17} />保存修改</button></div></header>
+    <header className="tavern-panel-heading"><div><span>WORLD INFORMATION</span><h3 id="lorebook-panel-title">世界书</h3><p>关键词触发、递归扫描与注入位置均兼容 SillyTavern 数据结构。</p></div><div className="panel-heading-actions"><button id="lorebook-import-open" type="button" aria-label="导入世界书" onClick={() => document.getElementById('lorebook-import-file')?.click()}><GameIcon name="upload" size={17} />导入</button><input id="lorebook-import-file" className="tavern-file-input" type="file" accept=".json,application/json" aria-label="选择世界书 JSON" onChange={(event) => void importBook(event)} /><button id="lorebook-export" type="button" aria-label="导出当前世界书" disabled={!draft} onClick={exportBook}><GameIcon name="save" size={17} />导出</button><button id="lorebook-create" type="button" onClick={create}><GameIcon name="book" size={17} />新建世界书</button><button id="lorebook-save" className="primary-button" type="button" disabled={!dirty} onClick={() => void save()}><GameIcon name="upload" size={17} />保存修改</button></div></header>
     {notice && <div className="tavern-panel-notice" role="status">{notice}</div>}
     <div className="tavern-master-detail">
       <aside className="tavern-master-list" aria-label="世界书列表"><div className="master-list-summary"><strong>{tavern.lorebooks.length}</strong><span>册本地世界书</span></div>{tavern.lorebooks.map((book) => <div key={book.id} className={`master-list-item ${book.id === selectedId ? 'is-active' : ''}`}><button id={`lorebook-select-${book.id}`} type="button" onClick={() => setSelectedId(book.id)}><span>{book.entries.length} 条</span><strong>{book.name}</strong><small>{book.description}</small></button><label title="挂载到会话"><input id={`lorebook-active-${book.id}`} type="checkbox" checked={active.has(book.id)} onChange={() => void toggleActive(book.id)} /><span>挂载</span></label></div>)}</aside>

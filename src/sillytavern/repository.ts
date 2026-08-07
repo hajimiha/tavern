@@ -3,6 +3,12 @@ import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
 import type { CharacterCard, ChatPreset, ChatSession, Lorebook, TavernSettings } from './types'
+import { loadRepositoryContentPack, mergeById, type TavernContentPack } from './content-pack'
+
+export type TavernContentPackLoader = () => Promise<TavernContentPack | null>
+const defaultContentPackLoader: TavernContentPackLoader = import.meta.env.MODE === 'test'
+  ? async () => null
+  : loadRepositoryContentPack
 
 export interface TavernRepository {
   initialize(): Promise<void>
@@ -27,10 +33,14 @@ export interface TavernRepository {
 }
 
 class DexieTavernRepository implements TavernRepository {
-  constructor(private readonly database: MistvaleTavernDatabase) {}
+  constructor(
+    private readonly database: MistvaleTavernDatabase,
+    private readonly contentPackLoader: TavernContentPackLoader,
+  ) {}
 
   async initialize(): Promise<void> {
     const defaults = createMistvaleDefaults()
+    const contentPack = await this.contentPackLoader()
     await this.database.transaction(
       'rw',
       this.database.lorebooks,
@@ -39,20 +49,30 @@ class DexieTavernRepository implements TavernRepository {
       this.database.sessions,
       this.database.settings,
       async () => {
+        const storedSettings = await this.database.settings.get('mistvale-settings')
+        const shouldPublishPack = Boolean(contentPack && storedSettings?.contentPackVersion !== contentPack.contentVersion)
         if ((await this.database.lorebooks.count()) === 0) {
-          await this.database.lorebooks.bulkAdd(defaults.lorebooks)
+          await this.database.lorebooks.bulkAdd(mergeById(defaults.lorebooks, contentPack?.lorebooks ?? []))
+        } else if (shouldPublishPack && contentPack?.lorebooks.length) {
+          await this.database.lorebooks.bulkPut(contentPack.lorebooks)
         }
         if ((await this.database.presets.count()) === 0) {
-          await this.database.presets.bulkAdd(defaults.presets)
+          await this.database.presets.bulkAdd(mergeById(defaults.presets, contentPack?.presets ?? []))
+        } else if (shouldPublishPack && contentPack?.presets.length) {
+          await this.database.presets.bulkPut(contentPack.presets)
         }
         if ((await this.database.characters.count()) === 0) {
-          await this.database.characters.bulkAdd(defaults.characters)
+          await this.database.characters.bulkAdd(mergeById(defaults.characters, contentPack?.characters ?? []))
+        } else if (shouldPublishPack && contentPack?.characters.length) {
+          await this.database.characters.bulkPut(contentPack.characters)
         }
         if ((await this.database.sessions.count()) === 0 && defaults.sessions.length > 0) {
           await this.database.sessions.bulkAdd(defaults.sessions)
         }
         if ((await this.database.settings.count()) === 0) {
-          await this.database.settings.add(defaults.settings)
+          await this.database.settings.add({ ...defaults.settings, contentPackVersion: contentPack?.contentVersion })
+        } else if (shouldPublishPack && contentPack) {
+          await this.database.settings.update('mistvale-settings', { contentPackVersion: contentPack.contentVersion })
         }
       },
     )
@@ -95,8 +115,11 @@ class DexieTavernRepository implements TavernRepository {
   }
 }
 
-export function createTavernRepository(database: MistvaleTavernDatabase = tavernDatabase): TavernRepository {
-  return new DexieTavernRepository(database)
+export function createTavernRepository(
+  database: MistvaleTavernDatabase = tavernDatabase,
+  contentPackLoader: TavernContentPackLoader = defaultContentPackLoader,
+): TavernRepository {
+  return new DexieTavernRepository(database, contentPackLoader)
 }
 
 export const tavernRepository = createTavernRepository()

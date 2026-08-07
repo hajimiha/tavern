@@ -47,6 +47,11 @@ describe('NPC 酒馆会话', () => {
     )
 
     expect(await screen.findByRole('heading', { name: '与洛岚的酒馆会话' })).toBeVisible()
+    const scrollRegion = screen.getByTestId('tavern-dialogue-scroll')
+    const composer = screen.getByRole('form', { name: '自由输入对话' })
+    expect(scrollRegion).toContainElement(screen.getByLabelText('本回合可选行动'))
+    expect(scrollRegion).not.toContainElement(composer)
+    expect(scrollRegion.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: '查看会话历史' })).toBeVisible()
     expect(await screen.findByText(/DeepSeek/)).toBeVisible()
     expect(screen.queryByText(/本地叙事|LOCAL TAVERN|只在本机生成/)).not.toBeInTheDocument()

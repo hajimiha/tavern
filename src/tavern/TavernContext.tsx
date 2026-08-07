@@ -26,6 +26,7 @@ interface SendTurnInput {
   affinity?: number
   memoryTags?: string[]
   signal?: AbortSignal
+  onDelta?: (raw: string) => void
 }
 
 interface TavernContextValue {
@@ -176,6 +177,7 @@ export function TavernProvider({ children, repository = tavernRepository }: { ch
       variables,
       formatPrompt: currentSettings.formatPromptTemplate,
       signal: input.signal,
+      onDelta: input.onDelta,
     })
     const now = Date.now()
     const userMessage: ChatMessage = {

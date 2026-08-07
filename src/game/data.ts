@@ -38,7 +38,7 @@ export const npcs: Npc[] = [
 ]
 
 export const locations: Location[] = [
-  { id:'farm', name:'苔灯农场', subtitle:'南坡田区', description:'被旧石墙围住的初始农场，暮色里总有萤火贴着麦梢飞。', hours:'全天', travelMinutes:0, npcIds:[], category:'home' },
+  { id:'farm', name:'苔灯农场', subtitle:'南坡田区', description:'被旧石墙围住的初始农场，暮色里总有萤火贴着麦梢飞。', hours:'全天', travelMinutes:12, npcIds:[], mapPosition:{x:3,y:54,w:21,h:31}, category:'home' },
   { id:'mayor-home', name:'村长家', subtitle:'壁炉议事厅', description:'村民委托与季节会议的中心。', hours:'08:00–20:00', travelMinutes:20, npcIds:['loran','freya','mina'], mapPosition:{x:39,y:21,w:15,h:25}, category:'village' },
   { id:'general-store', name:'杂货店', subtitle:'风铃商行', description:'出售种子、材料并回收农产品。', hours:'09:00–18:00', travelMinutes:18, npcIds:['liuan','taomi'], mapPosition:{x:27,y:37,w:11,h:17}, category:'village' },
   { id:'smithy', name:'铁匠铺', subtitle:'羽火熔炉', description:'工具升级、精炼与装备修理。', hours:'10:00–19:00', travelMinutes:24, npcIds:['yanque'], mapPosition:{x:56,y:31,w:14,h:20}, category:'village' },

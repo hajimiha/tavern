@@ -41,8 +41,9 @@ export function VillageMap() {
   const suppressClickTimerRef = useRef<number | null>(null)
   const frameRef = useRef<number | null>(null)
   const pendingOffsetRef = useRef<MapPoint | null>(null)
-  const mapLocations = locations.filter((location) => location.id !== 'farm')
+  const mapLocations = locations.filter((location) => location.mapPosition)
   const currentLocation = locations.find((location) => location.id === state.location)
+  const destinationIsCurrent = destination?.id === state.location
 
   const commitOffset = useCallback((nextOffset: MapPoint) => {
     setOffset(clampMapOffset(nextOffset, viewportSize, worldSize))
@@ -244,7 +245,7 @@ export function VillageMap() {
               aria-current={state.location === location.id ? 'location' : undefined}
               onClick={() => chooseDestination(location)}
             >
-              <span className="map-hotspot-label"><strong>{location.name}</strong><small>{location.travelMinutes} 分钟</small></span>
+              <span className="map-hotspot-label"><strong>{location.name}</strong><small>{state.location === location.id ? '当前位置' : `${location.travelMinutes} 分钟`}</small></span>
             </button>
           ))}
         </div>
@@ -258,7 +259,7 @@ export function VillageMap() {
       <details className="map-mobile-list">
         <summary id="map-mobile-toggle">查看地点列表</summary>
         <div>
-          {mapLocations.map((location) => <button id={`map-list-${location.id}`} key={location.id} type="button" aria-label={`从地点列表选择${location.name}`} onClick={() => setDestination(location)}><span>{location.name}</span><small>{location.travelMinutes} 分钟</small></button>)}
+          {mapLocations.map((location) => <button id={`map-list-${location.id}`} key={location.id} type="button" aria-label={`从地点列表选择${location.name}`} onClick={() => setDestination(location)}><span>{location.name}</span><small>{state.location === location.id ? '当前位置' : `${location.travelMinutes} 分钟`}</small></button>)}
         </div>
       </details>
 
@@ -274,7 +275,7 @@ export function VillageMap() {
             <div><dt>开放</dt><dd>{destination.hours}</dd></div>
             <div><dt>在场</dt><dd>{destination.npcIds.length ? destination.npcIds.map((id) => npcs.find((npc) => npc.id === id)?.name).join('、') : '无人常驻'}</dd></div>
           </dl>
-          <button id={`travel-confirm-${destination.id}`} className="primary-button travel-confirm" type="button" aria-label={`确认前往${destination.name}`} onClick={confirmTravel}>确认出发</button>
+          <button id={`travel-confirm-${destination.id}`} className="primary-button travel-confirm" type="button" disabled={destinationIsCurrent} aria-label={destinationIsCurrent ? `已在${destination.name}` : `确认前往${destination.name}`} onClick={confirmTravel}>{destinationIsCurrent ? '已在此处' : '确认出发'}</button>
         </section>
       )}
     </nav>

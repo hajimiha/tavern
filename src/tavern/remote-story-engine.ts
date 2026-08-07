@@ -23,6 +23,7 @@ export interface RemoteTurnInput {
   variables: Record<string, unknown>
   formatPrompt: string
   signal?: AbortSignal
+  onDelta?: (raw: string) => void
 }
 
 export interface RemoteTurnResult {
@@ -95,7 +96,10 @@ export async function createRemoteTurn(input: RemoteTurnInput): Promise<RemoteTu
   })
   let raw = ''
   for await (const event of input.api.stream(prepared, input.signal)) {
-    if (event.type === 'delta') raw += event.text
+    if (event.type === 'delta') {
+      raw += event.text
+      input.onDelta?.(raw)
+    }
   }
   if (!raw.trim()) throw new Error('模型没有返回可显示的剧情文字。')
 

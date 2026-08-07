@@ -138,6 +138,7 @@
 .tavern-panel-heading h3 { margin: 3px 0 3px; font-size: clamp(18px, 2vw, 25px); }
 .tavern-panel-heading p { max-width: 690px; margin: 0; color: var(--text-muted); font-size: 9px; line-height: 1.55; }
 .panel-heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.tavern-file-input { position: fixed !important; width: 1px !important; height: 1px !important; overflow: hidden !important; opacity: 0 !important; pointer-events: none !important; }
 .panel-heading-actions button, .editor-title-row > button, .session-inspector > header button { display: inline-flex; min-height: 42px; align-items: center; gap: 6px; padding: 0 12px; color: var(--text-secondary); border: 1px solid var(--border-muted); border-radius: 8px; background: rgba(242, 229, 198, .04); font-size: 8px; }
 .panel-heading-actions .primary-button, .editor-title-row .primary-button { color: #1a2117; border-color: var(--copper-300); background: linear-gradient(#edc46a, #d5a64a); }
 .tavern-panel button:disabled { cursor: not-allowed; opacity: .4; }
@@ -221,6 +222,13 @@
 .api-provider-options input { width: 100%; }
 .api-credential-kind { display: block; margin-top: 6px; color: #bba6d8; font-size: 8px; line-height: 1.5; }
 .api-field-error { display: block; margin-top: -2px; color: #e5a29c; font-size: 8px; line-height: 1.45; }
+.api-toggle-field { display: grid; min-height: 58px; grid-template-columns: 22px 1fr; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid rgba(154, 122, 199, .2); border-radius: 8px; background: rgba(154, 122, 199, .055); cursor: pointer; }
+.api-toggle-field input { width: 18px !important; min-height: 18px !important; accent-color: var(--copper-300); }
+.api-toggle-field > span { margin: 0 !important; }
+.api-toggle-field strong, .api-toggle-field small { display: block; }
+.api-toggle-field strong { color: var(--text-primary); font-size: 9px; }
+.api-toggle-field small { margin-top: 3px; color: var(--text-muted); font-size: 8px; }
+.api-parameter-note { padding: 8px 10px; color: var(--text-muted); border-left: 2px solid rgba(154, 122, 199, .52); background: rgba(154, 122, 199, .045); font-size: 8px; line-height: 1.55; }
 .api-secret-input { display: grid; grid-template-columns: minmax(0, 1fr) 44px; overflow: hidden; border: 1px solid var(--border-muted); border-radius: 8px; background: rgba(2, 10, 8, .54); transition: border-color 160ms, box-shadow 160ms; }
 .api-secret-input:focus-within { border-color: var(--copper-300); box-shadow: 0 0 0 3px rgba(213, 166, 74, .11); }
 .api-secret-input input { border: 0; border-radius: 0; background: transparent; box-shadow: none !important; }
@@ -312,6 +320,13 @@
 .character-stat { display: grid; grid-template-columns: auto 1fr; align-items: end; gap: 6px; }
 .character-stat strong { color: var(--copper-300); font-family: var(--font-numeric); font-size: 25px; }
 .character-stat span { padding-bottom: 3px; color: var(--text-muted); font-size: 8px; }
+.character-heading-tools { display: flex; align-items: center; gap: 12px; }
+.character-heading-tools > button { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 12px; color: var(--text-primary); border: 1px solid var(--border-copper); border-radius: 8px; background: rgba(213, 166, 74, .08); font-size: 8px; }
+.repository-content-guide { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin: -2px 0 14px; padding: 11px 13px; color: var(--text-secondary); border: 1px solid rgba(154, 122, 199, .24); border-radius: 9px; background: rgba(154, 122, 199, .06); }
+.repository-content-guide > svg { color: #c3afe0; }
+.repository-content-guide strong { color: var(--text-primary); font-size: 9px; }
+.repository-content-guide p { margin: 3px 0 0; font-size: 8px; line-height: 1.55; }
+.repository-content-guide code { color: var(--copper-300); font-family: var(--font-numeric); }
 .character-workspace { position: relative; min-height: 0; flex: 1; }
 .character-card-grid { display: grid; grid-template-columns: repeat(5, minmax(135px, 1fr)); gap: 9px; }
 .character-card-grid article { position: relative; display: grid; min-width: 0; grid-template-columns: 48px 1fr; grid-template-rows: auto auto; gap: 7px 9px; padding: 9px; overflow: hidden; border: 1px solid var(--border-muted); border-radius: 10px; background: linear-gradient(145deg, rgba(23, 50, 40, .62), rgba(5, 16, 14, .72)); transition: transform 180ms var(--ease-out), border-color 180ms, box-shadow 180ms; animation: character-card-in 260ms var(--ease-out) both; animation-delay: calc(var(--card-index) * 18ms); }

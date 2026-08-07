@@ -4,7 +4,8 @@ import type { GameRuleSettings } from './types'
 export const GAME_RULES_STORAGE_KEY = 'mistvale-game-rules-v1'
 
 function browserStorage() {
-  return typeof window === 'undefined' ? undefined : window.localStorage
+  if (typeof window === 'undefined') return undefined
+  try { return window.localStorage } catch { return undefined }
 }
 
 export function loadGameRules(storage: Storage | undefined = browserStorage()): GameRuleSettings {

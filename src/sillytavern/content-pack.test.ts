@@ -1,0 +1,38 @@
+import { describe, expect, it } from 'vitest'
+import { createMistvaleDefaults } from './defaults'
+import { createContentPack, parseContentPack } from './content-pack'
+
+describe('仓库酒馆内容包', () => {
+  it('导出世界书、预设、角色卡与可发布版本号', () => {
+    const defaults = createMistvaleDefaults()
+    const pack = createContentPack({
+      contentVersion: '2026.08.08.2',
+      lorebooks: defaults.lorebooks,
+      presets: defaults.presets,
+      characters: defaults.characters,
+    })
+
+    expect(pack).toMatchObject({ schemaVersion: 1, contentVersion: '2026.08.08.2' })
+    expect(pack.lorebooks).toHaveLength(2)
+    expect(pack.presets).toHaveLength(1)
+    expect(pack.characters).toHaveLength(15)
+  })
+
+  it('拒绝缺少版本号或包含非图像立绘的仓库包', () => {
+    expect(() => parseContentPack({ schemaVersion: 1, contentVersion: '', lorebooks: [], presets: [], characters: [] })).toThrow(/版本/)
+    const defaults = createMistvaleDefaults()
+    expect(() => createContentPack({
+      contentVersion: 'bad-portrait',
+      lorebooks: [],
+      presets: [],
+      characters: [{ ...defaults.characters[0], portraitByAffinity: { stranger: 'javascript:alert(1)' } }],
+    })).toThrow(/角色卡|立绘/)
+  })
+
+  it('拒绝会污染所有客户端的畸形世界书、预设与角色卡', () => {
+    const base = { schemaVersion: 1, contentVersion: 'bad-shape', exportedAt: new Date().toISOString() }
+    expect(() => parseContentPack({ ...base, lorebooks: [null], presets: [], characters: [] })).toThrow(/世界书/)
+    expect(() => parseContentPack({ ...base, lorebooks: [], presets: [{ id: 'bad', name: {}, settings: {} }], characters: [] })).toThrow(/预设/)
+    expect(() => parseContentPack({ ...base, lorebooks: [], presets: [], characters: [{ id: 'bad', portraitByAffinity: {} }] })).toThrow(/角色卡/)
+  })
+})

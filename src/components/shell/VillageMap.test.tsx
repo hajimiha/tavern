@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameProvider, useGame } from '../../game/GameContext'
+import { initialGameState } from '../../game/reducer'
 import { VillageMap } from './VillageMap'
 
 function LocationObserver() {
@@ -25,11 +26,32 @@ function pointerEvent(type: string, init: MouseEventInit & { pointerId: number }
 describe('连续像素村庄地图', () => {
   afterEach(() => vi.useRealTimers())
 
-  it('为十个村庄地点提供可聚焦的语义热区', () => {
+  it('为包含农场在内的十一个地点提供可聚焦的语义热区', () => {
     render(<GameProvider><VillageMap /><LocationObserver /></GameProvider>)
 
-    expect(screen.getAllByRole('button', { name: /^前往/ })).toHaveLength(10)
+    expect(screen.getAllByRole('button', { name: /^前往/ })).toHaveLength(11)
+    expect(screen.getByRole('button', { name: '前往苔灯农场' })).toHaveAttribute('id', 'map-location-farm')
     expect(screen.getByRole('button', { name: '前往矿洞' })).toHaveAttribute('id', 'map-location-mine')
+  })
+
+  it('离开农场后可从地图热区和手机地点列表返回农场', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider initialState={{ ...initialGameState, location: 'mayor-home' }}><VillageMap /><LocationObserver /></GameProvider>)
+
+    expect(screen.getByRole('button', { name: '从地点列表选择苔灯农场' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '前往苔灯农场' }))
+    const dialog = screen.getByRole('dialog', { name: '前往苔灯农场' })
+    expect(dialog).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: '确认前往苔灯农场' }))
+    expect(screen.getByLabelText('当前地点标识')).toHaveTextContent('farm')
+  })
+
+  it('选择当前地点时不重复执行行程', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider><VillageMap /></GameProvider>)
+
+    await user.click(screen.getByRole('button', { name: '前往苔灯农场' }))
+    expect(screen.getByRole('button', { name: '已在苔灯农场' })).toBeDisabled()
   })
 
   it('确认行程后更新玩家位置', async () => {

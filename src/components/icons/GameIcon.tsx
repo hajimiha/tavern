@@ -37,6 +37,8 @@ import {
   FloppyDisk,
   CheckCircle,
   ShieldCheck,
+  CornersOut,
+  CornersIn,
 } from '@phosphor-icons/react'
 
 const icons = {
@@ -78,6 +80,8 @@ const icons = {
   save: FloppyDisk,
   success: CheckCircle,
   shield: ShieldCheck,
+  fullscreen: CornersOut,
+  fullscreenExit: CornersIn,
 }
 
 export type GameIconName = keyof typeof icons

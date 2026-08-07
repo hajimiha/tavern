@@ -40,12 +40,68 @@ const REVERSE_LOGIC_MAP: Record<LorebookEntry['selectiveLogic'], number> = {
   and_all: 3,
 };
 
-export function importLorebook(data: SillyTavernLorebookExport): Omit<Lorebook, 'id' | 'createdAt' | 'updatedAt'> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function assertOptionalScalar(record: Record<string, unknown>, key: string, type: 'string' | 'number' | 'boolean'): void {
+  if (record[key] !== undefined && typeof record[key] !== type) throw new Error(`导入字段 ${key} 类型无效。`);
+}
+
+function validateLorebookImport(value: unknown): SillyTavernLorebookExport {
+  if (!isRecord(value) || (value.name !== undefined && typeof value.name !== 'string') || !isRecord(value.entries)) {
+    throw new Error('世界书必须是包含名称与 entries 对象的 JSON。');
+  }
+  for (const entry of Object.values(value.entries)) {
+    if (!isRecord(entry) || !isStringArray(entry.key) || (entry.keysecondary !== undefined && !isStringArray(entry.keysecondary)) || typeof entry.content !== 'string') {
+      throw new Error('世界书条目必须包含字符串关键词数组与正文。');
+    }
+    for (const key of ['comment', 'group'] as const) assertOptionalScalar(entry, key, 'string');
+    for (const key of ['uid', 'selectiveLogic', 'order', 'position', 'role', 'probability', 'depth', 'sticky', 'cooldown', 'delay', 'weight', 'scanDepth'] as const) assertOptionalScalar(entry, key, 'number');
+    for (const key of ['constant', 'selective', 'addMemo', 'disable', 'useProbability', 'excluded', 'caseSensitive', 'matchWholeWords', 'excludeRecursion', 'preventRecursion', 'useGroupScoring', 'matchPersonaDescription', 'matchCharacterDescription', 'matchCharacterPersonality', 'matchCharacterDepthPrompt', 'matchScenario', 'matchCreatorNotes'] as const) assertOptionalScalar(entry, key, 'boolean');
+    if (entry.decorators !== undefined && !isStringArray(entry.decorators)) throw new Error('世界书 decorators 必须是字符串数组。');
+  }
+  if (value.settings !== undefined && !isRecord(value.settings)) throw new Error('世界书 settings 必须是对象。');
+  return value as unknown as SillyTavernLorebookExport;
+}
+
+function validatePresetImport(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error('预设必须是 JSON 对象。');
+  if (value.name !== undefined && typeof value.name !== 'string') throw new Error('预设名称必须是字符串。');
+  if (value.preset !== undefined && typeof value.preset !== 'string') throw new Error('预设名称必须是字符串。');
+  if (value.description !== undefined && typeof value.description !== 'string') throw new Error('预设说明必须是字符串。');
+  if (value.prompt_order !== undefined) {
+    if (!Array.isArray(value.prompt_order) || !value.prompt_order.every((item) => isRecord(item)
+      && typeof item.identifier === 'string'
+      && (item.name === undefined || typeof item.name === 'string')
+      && (item.role === undefined || ['system', 'user', 'assistant'].includes(String(item.role)))
+      && (item.enabled === undefined || typeof item.enabled === 'boolean'))) {
+      throw new Error('预设 prompt_order 结构无效。');
+    }
+  }
+  if (value.prompts !== undefined) {
+    if (!Array.isArray(value.prompts) || !value.prompts.every((item) => isRecord(item)
+      && typeof item.identifier === 'string'
+      && (item.role === undefined || ['system', 'user', 'assistant'].includes(String(item.role)))
+      && (item.content === undefined || typeof item.content === 'string'))) {
+      throw new Error('预设 prompts 结构无效。');
+    }
+  }
+  return value;
+}
+
+export function importLorebook(value: unknown): Omit<Lorebook, 'id' | 'createdAt' | 'updatedAt'> {
+  const data = validateLorebookImport(value);
   const rawEntries = Object.values(data.entries || {});
   const entries: LorebookEntry[] = rawEntries
-    .filter((e) => !e.disable && !e.excluded)
     .map((e) => ({
       id: crypto.randomUUID(),
+      disabled: e.disable ?? false,
+      excluded: e.excluded ?? false,
       keys: e.key || [],
       secondaryKeys: e.keysecondary || [],
       content: e.content || '',
@@ -107,12 +163,12 @@ export function exportLorebook(lorebook: Lorebook): SillyTavernLorebookExport {
       order: e.order,
       position: REVERSE_POSITION_MAP[e.position] as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7,
       role: e.role ?? 0,
-      disable: false,
+      disable: e.disabled ?? false,
       probability: e.probability,
       depth: e.depth ?? 4,
       group: e.group ?? '',
       useProbability: e.useProbability ?? (e.probability < 100),
-      excluded: false,
+      excluded: e.excluded ?? false,
       sticky: e.sticky ?? 0,
       cooldown: e.cooldown ?? 0,
       delay: e.delay ?? 0,
@@ -146,11 +202,12 @@ export function exportLorebook(lorebook: Lorebook): SillyTavernLorebookExport {
   };
 }
 
-export function importPreset(data: Record<string, any>): Omit<ChatPreset, 'id' | 'createdAt' | 'updatedAt'> {
+export function importPreset(value: unknown): Omit<ChatPreset, 'id' | 'createdAt' | 'updatedAt'> {
+  const data = validatePresetImport(value);
   const name = data.preset || data.name || '导入的预设';
   return {
-    name,
-    description: data.description,
+    name: String(name),
+    description: typeof data.description === 'string' ? data.description : undefined,
     settings: data,
   };
 }

@@ -2,6 +2,7 @@ import { locations } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 import type { SkillId } from '../../game/types'
 import { GameIcon, type GameIconName } from '../icons/GameIcon'
+import { useFullscreen } from '../../hooks/useFullscreen'
 
 const skillMeta: Record<SkillId, { label: string; icon: GameIconName }> = {
   fishing: { label: '钓鱼', icon: 'fishing' },
@@ -19,8 +20,13 @@ const formatTime = (minutes: number) => {
 
 export function TopHud() {
   const { state, dispatch } = useGame()
+  const fullscreen = useFullscreen()
   const location = locations.find((item) => item.id === state.location) ?? locations[0]
   const openModal = (modal: 'inventory' | 'journal' | 'settings' | 'tavern') => dispatch({ type: 'OPEN_MODAL', modal })
+  const toggleFullscreen = async () => {
+    if (await fullscreen.toggle()) return
+    dispatch({ type: 'ADD_TOAST', toast: { tone: 'warning', title: '无法切换全屏', message: fullscreen.supported ? '浏览器拒绝了全屏请求，请检查站点权限。' : '当前浏览器不支持网页全屏。' } })
+  }
 
   return (
     <header className="top-hud" aria-label="玩家状态">
@@ -76,6 +82,9 @@ export function TopHud() {
         </button>
         <button id="hud-open-tavern" className="icon-button" aria-label="打开酒馆中枢" aria-expanded={state.activeModal === 'tavern'} onClick={() => openModal('tavern')}>
           <GameIcon name="memory" weight="duotone" />
+        </button>
+        <button id="hud-toggle-fullscreen" className="icon-button" aria-label={fullscreen.isFullscreen ? '退出全屏' : '进入全屏'} aria-pressed={fullscreen.isFullscreen} onClick={() => void toggleFullscreen()}>
+          <GameIcon name={fullscreen.isFullscreen ? 'fullscreenExit' : 'fullscreen'} weight="duotone" />
         </button>
         <button id="hud-open-settings" className="icon-button" aria-label="打开游戏设置" aria-expanded={state.activeModal === 'settings'} onClick={() => openModal('settings')}>
           <GameIcon name="settings" weight="duotone" />

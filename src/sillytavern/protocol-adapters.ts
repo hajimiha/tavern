@@ -67,22 +67,41 @@ export function buildProviderRequest(
   const provider = getTavernProvider(config.provider)
   const url = joinUrl(config.baseUrl, resolveChatPath(config, stream))
   const common = { model: config.model, temperature: config.temperature }
+  const openAiSampling = {
+    top_p: config.topP,
+    frequency_penalty: config.frequencyPenalty,
+    presence_penalty: config.presencePenalty,
+  }
   let body: Record<string, unknown>
 
   if (provider.protocol === 'anthropic-messages') {
     const { system, messages } = systemAndMessages(request)
-    body = { ...common, max_tokens: config.maxTokens, stream, messages, ...(system ? { system } : {}) }
+    body = { ...common, max_tokens: config.maxResponseLength, top_p: config.topP, stream, messages, ...(system ? { system } : {}) }
   } else if (provider.protocol === 'gemini' || provider.protocol === 'vertex-gemini') {
     body = {
       ...geminiContents(request),
-      generationConfig: { temperature: config.temperature, maxOutputTokens: config.maxTokens },
+      generationConfig: {
+        temperature: config.temperature,
+        maxOutputTokens: config.maxResponseLength,
+        topP: config.topP,
+        frequencyPenalty: config.frequencyPenalty,
+        presencePenalty: config.presencePenalty,
+      },
     }
   } else if (provider.protocol === 'cohere-v2') {
-    body = { ...common, max_tokens: config.maxTokens, stream, messages: request.messages }
+    body = {
+      ...common,
+      max_tokens: config.maxResponseLength,
+      p: config.topP,
+      frequency_penalty: config.frequencyPenalty,
+      presence_penalty: config.presencePenalty,
+      stream,
+      messages: request.messages,
+    }
   } else if (provider.protocol === 'cloudflare-workers-ai') {
-    body = { messages: request.messages, temperature: config.temperature, max_tokens: config.maxTokens, stream }
+    body = { messages: request.messages, temperature: config.temperature, top_p: config.topP, max_tokens: config.maxResponseLength, stream }
   } else {
-    body = { ...common, messages: request.messages, max_tokens: config.maxTokens, stream }
+    body = { ...common, ...openAiSampling, messages: request.messages, max_tokens: config.maxResponseLength, stream }
   }
 
   return {

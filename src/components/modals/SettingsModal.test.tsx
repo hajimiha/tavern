@@ -59,4 +59,17 @@ describe('游戏玩法设置', () => {
     await user.click(screen.getByRole('button', { name: '应用玩法规则' }))
     expect(screen.getByLabelText('当前经验倍率')).toHaveTextContent('1.75')
   })
+
+  it('提供自动存档状态、导出导入和应用内新档确认', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider initialState={{ ...initialGameState, activeModal: 'settings' }}><ModalHost /></GameProvider>)
+
+    expect(screen.getByLabelText('自动存档管理')).toHaveTextContent('自动存档')
+    expect(screen.getByRole('button', { name: '导出游戏存档' })).toHaveAttribute('id', 'settings-save-export')
+    expect(screen.getByLabelText('导入游戏存档')).toHaveAttribute('id', 'settings-save-import')
+    await user.click(screen.getByRole('button', { name: '新建游戏存档' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('确认清除当前游戏进度')
+    await user.click(screen.getByRole('button', { name: '取消新建存档' }))
+    expect(screen.queryByText('确认清除当前游戏进度')).not.toBeInTheDocument()
+  })
 })

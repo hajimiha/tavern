@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { importMultipleLorebooks, renameLorebook } from './importer';
+import { exportLorebook, importLorebook, importMultipleLorebooks, importPreset, renameLorebook } from './importer';
 import type { SillyTavernLorebookExport } from './types';
 
 const stub = (name: string): SillyTavernLorebookExport => ({
@@ -27,5 +27,25 @@ describe('importer multi/rename', () => {
     expect(next.name).toBe('new');
     expect(next.id).toBe('1');
     expect(next.updatedAt).toBeGreaterThanOrEqual(lb.updatedAt);
+  });
+
+  it('rejects malformed lorebooks and presets before persistence', () => {
+    expect(() => importLorebook({ name: {}, entries: {} })).toThrow();
+    expect(() => importLorebook({ name: 'bad', entries: { 0: { key: 'not-an-array', content: 'text' } } })).toThrow();
+    expect(() => importPreset({ name: {}, prompt_order: 'not-an-array' })).toThrow();
+    expect(() => importPreset({ name: 'bad', prompt_order: [{ identifier: {} }] })).toThrow();
+  });
+
+  it('preserves disabled and excluded SillyTavern entries during round trips', () => {
+    const imported = importLorebook({
+      name: 'archive',
+      entries: {
+        0: { key: ['mist'], keysecondary: [], content: 'hidden lore', disable: true, excluded: false },
+      },
+    });
+    const exported = exportLorebook({ ...imported, id: 'book', createdAt: 1, updatedAt: 1 });
+
+    expect(imported.entries[0]).toMatchObject({ disabled: true, excluded: false });
+    expect(exported.entries['0']).toMatchObject({ disable: true, excluded: false, content: 'hidden lore' });
   });
 });
