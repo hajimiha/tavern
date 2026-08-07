@@ -90,3 +90,41 @@
 - DeepSeek 与大多数兼容服务可统一到 `GET /models` 和 `POST /chat/completions`；流式实现必须同时处理跨 chunk 的 SSE 行、`data:` 前缀和 `[DONE]`，并保留非流式 JSON 回退。
 - 真实浏览器证明 API 配置在 1440×900 与 375×812 均可用：84 个 ID 全部唯一，主要输入/按钮为 44px，手机面板无横向滚动，0 console/page errors。
 - 最终地图回归证明修复有效：拖动后偏移发生变化，随后建筑点击产生行程预览并可抵达杂货店；精简后的两个辅助按钮不会影响鼠标、触控或键盘拖动能力。
+
+## 2026-08-08 强制 API、多供应商与玩法设置
+- 用户明确要求删除本地叙事选项：NPC 对话必须依赖玩家配置且验证通过的模型 API；未配置时应阻止发送并直接引导到接口设置。
+- 参考供应商清单包含 Azure OpenAI、Chutes、Claude、Cloudflare Workers AI、Cohere、DeepSeek、Electron Hub、Fireworks AI、Groq、Google AI Studio、Google Vertex AI、MistralAI、MiniMax、Moonshot AI、NanoGPT、OpenRouter、Perplexity、Pollinations、SiliconFlow、xAI 与 Z.AI；必须依据各自官方文档区分 OpenAI-compatible、Anthropic Messages、Gemini 与 Azure 部署路径。
+- 设置页不能继续是静态概念图；需要可持久化、可恢复默认值并真正进入 reducer 规则计算的经验、好感、掉落、金币、作物生长、钓鱼、战斗与精力消耗设置。
+- 用户再次稳定复现地图与播种入口不可达，说明上一轮只覆盖了内部组件路径，必须补充从主页面真实指针点击到弹层/操作按钮的浏览器回归。
+- 农田根因已在源码中确认：`FarmStage` 的空地详情只显示说明文字，`GameAction` 与 reducer 完全没有播种动作；虽然初始背包已有种子，界面并不存在任何可以执行种植的按钮。这不是点击失效，而是功能缺失。
+- 地图上一轮浏览器脚本使用 `element.click()` 绕过了真实命中测试，因此没有覆盖玩家实际点击；本轮必须以 Playwright 鼠标点击建筑热点，并检查行程卡与按钮是否处于当前可见/可点击区域。
+- 当前 API 默认仍为 `adapterMode: local`，Context 会真实调用 `createLocalTurn`；UI 的模式下拉、状态徽标、对话页和楼层类型都保留本地分支，必须从默认值、迁移、Context 和文案四层一起移除。
+- UI/UX Pro Max 推荐设置页采用高密度深色控制台、受控表单、分组与渐进披露；数值输入在移动端使用正确 inputmode，错误在字段附近通过 `role=alert` 通知，主要触控目标保持 44px。
+- 地图真实点击的高概率根因是指针捕获时机：`handlePointerDown` 无论是否拖动都立即把 pointer capture 交给视口；浏览器随后可能把 `pointerup/click` 重定向到视口而不是建筑按钮。正确边界是超过 6px 拖动阈值后才捕获，普通点击必须完整留在热点按钮上。
+- 行程卡 CSS 本身位于地图容器右下并有 `z-index: 12`，高于世界层与遮罩，因此“按钮不出现”不是卡片被 CSS 层级遮挡的首要解释。
+- 玩法状态集中在单个 `GameState` + reducer 中，适合把规则设置作为 `GameState.settings` 的纯数据，并让所有收益/消耗在 reducer 边界统一调用倍率函数；界面设置可单独持久化到 localStorage，避免与世界书 IndexedDB 混杂。
+- 基线 Edge 复现已形成红灯证据：空地详情可见但播种按钮数量为 0；真实鼠标点击杂货店热点后行程按钮仍不可见，控制台无错误。这与“缺失播种动作”和“过早 pointer capture”两个根因一致。
+- Microsoft 2026 官方 Azure OpenAI v1 文档给出 `{endpoint}/openai/v1/chat/completions`，支持 `api-key` 或 Authorization；因此 Azure 不能简单套用当前固定 Bearer + 基础路径拼接，注册表需要可配置认证头与完整聊天路径。
+- Cloudflare Workers AI 官方 REST 路径是 `https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/run/{MODEL}`，Bearer 鉴权且响应包在 `result.response`；它需要 Account ID，不能当成普通 `/chat/completions` 服务。
+- Cohere 官方 v2 Chat 使用 `https://api.cohere.ai/v2/chat`、Bearer、`messages`，非流式正文位于 `message.content[0].text`，SSE 事件格式也不同；应独立适配而非伪装成 OpenAI-compatible。
+- 第一批官方检索没有稳定返回 Anthropic、Chutes 与 Fireworks 页面，后续改用各官方文档直达链接或限定域名继续核对，不能凭记忆填端点。
+- Chutes 官方当前提供 `https://llm.chutes.ai/v1` 的 OpenAI-compatible 网关，Bearer 鉴权，支持 `GET /models`、`POST /chat/completions` 与流式输出；默认模型应从实时列表读取，不硬编码容易过期的单一 ID。
+- Fireworks AI 官方 Chat Completions 为 `https://api.fireworks.ai/inference/v1/chat/completions`，Bearer 鉴权，请求/响应可复用 OpenAI 协议解析。
+- Groq 官方模型列表位于 `https://api.groq.com/openai/v1/models`，Bearer 鉴权；其聊天补全属于同一个 `/openai/v1` OpenAI-compatible 根地址。
+- Claude 官方 Messages 参考已定位到 `platform.claude.com/docs/en/api/messages`，仍需继续提取精确认证头、请求体和 SSE 事件字段后再编码。
+- Google AI Studio 使用 Gemini 原生协议：`generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent`，通过 `x-goog-api-key` 鉴权，请求体为 `contents`，不能直接复用 OpenAI `messages`。
+- Mistral 官方接口为 `https://api.mistral.ai/v1`，Bearer 鉴权，提供 `/models` 与 `/chat/completions`，流式输出采用 `data:` 与 `[DONE]`，可归入 OpenAI 兼容适配层。
+- MiniMax 当前国际站官方文档提供 OpenAI SDK 兼容入口 `https://api.minimax.io/v1`；聊天模型可走 Chat Completions，角色扮演专用能力仍需要保留可编辑模型名。
+- OpenRouter 官方 Chat Completions 为 `https://openrouter.ai/api/v1/chat/completions`，Bearer 鉴权并支持可选的 `HTTP-Referer` 与 `X-Title` 请求头。
+- 多供应商实现不能只扩展下拉框：至少需要 OpenAI 兼容、Anthropic Messages、Gemini、Cohere、Cloudflare Workers AI 五类协议适配器，Azure OpenAI还需 `api-key` 头支持。
+- Claude 官方直连根地址为 `https://api.anthropic.com`，请求 `POST /v1/messages`，使用 `x-api-key`、`anthropic-version: 2023-06-01` 与 `content-type`；`max_tokens` 必填，非流式文本位于 `content[].text`，流式正文来自 `content_block_delta.delta.text`，没有 `[DONE]`。
+- Google Vertex AI 使用 Gemini 原生 `contents/parts` 数据结构；REST 路径为 `https://aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{LOCATION}/publishers/google/models/{MODEL_ID}:generateContent`（区域端点亦受支持），以 OAuth access token 的 Bearer 头鉴权，需要项目 ID 和区域字段。
+- SiliconFlow 官方文档确认中国站 OpenAI 兼容根地址为 `https://api.siliconflow.cn/v1`；xAI 官方 OpenAPI 确认根地址 `https://api.x.ai/v1`，提供 `/models` 与 `/chat/completions`，两者可复用 OpenAI 协议族。
+- Perplexity 官方快速入门声明支持 OpenAI Chat Completions 格式；当前聊天路径是 `https://api.perplexity.ai/chat/completions`，不能擅自加 `/v1`。
+- NanoGPT 官方根地址为 `https://nano-gpt.com/api/v1`，提供 OpenAI-compatible `/chat/completions` 与 `/models`；Pollinations 官方统一根地址为 `https://gen.pollinations.ai/v1`，同样支持 Chat Completions、流式和模型目录。
+- Z.AI 官方聊天端点为 `https://api.z.ai/api/paas/v4/chat/completions`，Bearer 鉴权、OpenAI 形状响应；默认模型应使用当前文档的 `glm-5.1`，但允许玩家覆盖。
+- Moonshot/Kimi 国际站官方文档确认 OpenAI-compatible 根地址 `https://api.moonshot.ai/v1`；Electron Hub 官方文档确认 `https://api.electronhub.ai/v1`，两者都可复用模型目录与 Chat Completions 适配。
+- 至此参考图中的 21 个命名供应商都已找到官方或供应商自有文档依据；实现可用元数据注册表统一绝大多数兼容服务，并只为 Claude、Gemini/Vertex、Cohere、Cloudflare保留协议专用代码。
+- 当前新手档案在春季第 1 天却发放两种标记为秋季的种子；播种功能恢复时应同步把新手种子调整为春季可种，避免按钮出现后仍造成季节规则冲突。
+- 当前游戏奖励分散在聊天、送礼、任务、训练、采矿、战斗、钓鱼、收获、出售等 reducer 分支；规则倍率应通过一组统一纯函数切入这些边界，并在提示文字中显示倍率后的实际数值，避免“设置已保存但实际没生效”。
+- `VillageMap` 在 pointerdown 立即 `setPointerCapture` 且同步进入拖动态；修复应把 capture 与 `isDragging=true` 推迟到超过 6px 阈值，并在 finish 时仅对已捕获指针执行 release。

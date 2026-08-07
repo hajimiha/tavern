@@ -222,3 +222,29 @@
 | 远程剧情与 UI | 上下文组装、标签解析、会话落库、配置面板通过 | 通过 |
 | 桌面/手机 Edge | 84/84 IDs unique；0 console/page errors；API 面板无横向溢出 | 通过 |
 | 拖动后出行 | 拖动偏移变化；行程弹层出现；成功抵达杂货店 | 通过 |
+
+## Session: 2026-08-08 · 强制 API、多供应商、规则设置与交互回归
+
+### 需求接收与流程恢复
+- **Status:** in_progress
+- 运行 planning-with-files session catch-up，确认上一轮 `e2f480e` 已提交推送且当前工作区与 `origin/main` 同步。
+- 完整载入 systematic-debugging、TDD、sillytavern-web 与 UI/UX Pro Max 约束；用户此前已授权前端决策采用推荐方案，不再逐项询问。
+- 本轮分为四个可测试边界：交互回归根因、强制远程模型与多供应商、持久化玩法设置、真实浏览器验收。
+
+### 初步根因与设计系统
+- **Status:** in_progress
+- UI/UX Pro Max 设计系统检索建议延续现代深色游戏控制台、高密度 Dashboard、绿金强调色、受控表单、内联验证、44px 触控与 150–300ms 因果动效。
+- 源码确认播种动作从类型、reducer 到按钮均不存在；空地详情只有“购买种子后可种植”的说明，属于未实现功能。
+- 地图旧验收使用程序化 `element.click()`，没有验证真实指针命中与行程按钮可见性；需要重新建立真实浏览器复现。
+- 代码对比显示地图视口在 pointerdown 当下就捕获指针，即使用户只是点击；行程卡的层级和定位正常，下一步用真实鼠标复现“点击被重定向到视口”的假设。
+- 游戏仍是单一 reducer，设置倍率可通过纯函数集中应用并由 localStorage 仅持久化设置子树，不需要引入新的状态库。
+- Edge 红灯复现：`plotDialogVisible=true`、`plantingButtonCount=0`、`travelButtonVisible=false`、console errors=0。
+- 完成第一批官方接口核对：Azure OpenAI、Cloudflare Workers AI、Cohere 均存在与当前 OpenAI-compatible 适配器不同的路径、认证头或响应结构。
+- 完成 Chutes、Fireworks、Groq 官方接口核对：三者可归入 OpenAI-compatible 协议族，但根地址不同；Chutes 模型目录需要动态读取。
+- 已核对 Google AI Studio、Mistral、MiniMax 与 OpenRouter 官方接口：确认 Gemini 需要独立请求/响应适配；Mistral、MiniMax、OpenRouter可复用 OpenAI 兼容协议但保留各自官方默认地址和模型配置。
+- 已完成 Claude 与 Vertex AI 原生协议字段核对，并确认 SiliconFlow、xAI、Perplexity 的官方兼容路径；下一步补齐 Moonshot、NanoGPT、Pollinations、Electron Hub 与 Z.AI。
+- 已补齐 Moonshot、NanoGPT、Pollinations、Electron Hub 与 Z.AI 官方端点；参考供应商矩阵已完整，可进入设计规格与实现计划。
+- 已复核当前代码边界：API 配置仍只有 DeepSeek/自定义且默认本地；游戏为单 reducer；设置模态尚无实现；播种和指针捕获修复都可在现有架构内完成，无需更换技术栈。
+- 已定位完整实现切点：TavernContext 的本地分支与三处本地文案、API 面板模式选择、GameState/reducer 奖励边界、FarmStage 空地详情、VillageMap 捕获时机以及 ModalHost 的设置占位。
+- 已对照上一阶段设计/计划格式，确认本轮会保留纯前端与浏览器密钥边界，但明确推翻“离线本地叙事保底”，并用协议注册表替代单一 DeepSeek 适配。
+- 已完成并自检 Phase 8 设计规格与九任务 TDD 实施计划；未发现未决设计项，接口矩阵、规则生效边界、播种状态机和指针修复均已具备可执行验收标准。
