@@ -13,7 +13,8 @@ describe('仓库酒馆内容包', () => {
     })
 
     expect(pack).toMatchObject({ schemaVersion: 1, contentVersion: '2026.08.08.2' })
-    expect(pack.lorebooks).toHaveLength(2)
+    expect(pack.lorebooks).toHaveLength(3)
+    expect(pack.lorebooks.map((book) => book.id)).toContain('mistvale-calendar-festivals')
     expect(pack.presets).toHaveLength(1)
     expect(pack.characters).toHaveLength(15)
   })
