@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { npcs } from './data'
 import {
+  advanceCalendarClock,
   festivals,
   formatGameDate,
   getCalendarDate,
@@ -12,6 +13,7 @@ import {
   getSeasonForDay,
   getWeekday,
   isNpcBirthday,
+  MAX_GAME_YEAR,
 } from './calendar'
 
 describe('雾灯谷日历', () => {
@@ -24,6 +26,8 @@ describe('雾灯谷日历', () => {
     expect(getSeasonForDay(365)).toBe('冬')
     expect(getWeekday(1, 7)).toBe('周日')
     expect(formatGameDate(2, 365)).toBe('第2年12月31日')
+    expect(advanceCalendarClock(1, 365, 23 * 60 + 50, 20)).toEqual({ year: 2, day: 1, minutes: 10 })
+    expect(advanceCalendarClock(MAX_GAME_YEAR, 365, 1430, 60)).toEqual({ year: MAX_GAME_YEAR, day: 365, minutes: 1439 })
   })
 
   it('为每个月配置一个具有三项活动的独立节日', () => {

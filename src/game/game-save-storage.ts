@@ -1,5 +1,5 @@
 import { locations, spells } from './data'
-import { getSeasonForDay, getWeekday } from './calendar'
+import { getSeasonForDay, getWeekday, MAX_GAME_YEAR } from './calendar'
 import { initialGameState } from './reducer'
 import { normalizeGameRules } from './rules'
 import type { AffinityStage, GameState, LocationId, Relationship, SkillId } from './types'
@@ -106,7 +106,7 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
   const toolLevel = (candidate: unknown, fallback: number) => Math.min(4, integer(candidate, fallback, 1))
   const rawFishing: Record<string, unknown> = isObject(value.fishing) ? value.fishing : {}
   const knownSpellIds = new Set(spells.map((spell) => spell.id))
-  const year = integer(value.year, initialGameState.year, 1)
+  const year = Math.min(MAX_GAME_YEAR, integer(value.year, initialGameState.year, 1))
   const day = Math.min(365, integer(value.day, initialGameState.day, 1))
 
   return {

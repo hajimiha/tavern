@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { MAX_GAME_YEAR } from './calendar'
 import { initialGameState } from './reducer'
 import {
   GAME_SAVE_STORAGE_KEY,
@@ -94,6 +95,10 @@ describe('版本化游戏自动存档', () => {
       weekday: '周一',
     } as never)
     expect(sanitized).toMatchObject({ year: 1, day: 365, minutes: 1439, season: '冬', weekday: '周一' })
+
+    const extreme = sanitizeGameState({ ...initialGameState, year: Number.MAX_VALUE } as never)
+    expect(extreme.year).toBe(MAX_GAME_YEAR)
+    expect(extreme.weekday).toMatch(/^周[一二三四五六日]$/)
   })
 
   it('浏览器拒绝存储访问时不会中断游戏，也不会伪报保存成功', () => {

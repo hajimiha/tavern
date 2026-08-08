@@ -66,6 +66,17 @@ describe('连续像素村庄地图', () => {
     expect(screen.getByLabelText('当前地点标识')).toHaveTextContent('mine')
   })
 
+  it('按预计抵达时刻显示目的地的动态在场人物', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider initialState={{ ...initialGameState, year: 1, day: 1, minutes: 18 * 60 }}><VillageMap /></GameProvider>)
+
+    await user.click(screen.getByRole('button', { name: '前往图书馆' }))
+    const dialog = screen.getByRole('dialog', { name: '前往图书馆' })
+    expect(within(dialog).getByText('预计在场')).toBeVisible()
+    expect(within(dialog).getByText('柳安、桃弥、维娜')).toBeVisible()
+    expect(within(dialog).queryByText('无人常驻')).not.toBeInTheDocument()
+  })
+
   it('保留定位与重置控件，并通过键盘提供平移路径', async () => {
     const user = userEvent.setup()
     render(<GameProvider><VillageMap /></GameProvider>)

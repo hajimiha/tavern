@@ -353,15 +353,21 @@ expect(twice.toasts).toHaveLength(1)
 
 为每条 toast 使用独立的子组件计时器，计时 effect 只依赖该 toast 的 `id` 与稳定 `dispatch`；新 toast 加入时不能重新启动已显示 toast 的 2 秒计时器。组件卸载时清理自己的 timeout。
 
-- [ ] **Step 4: 运行定向测试、`pnpm test:run`、`pnpm build` 和 `git diff --check`**
+- [x] **Step 4: 运行定向测试、`pnpm test:run`、`pnpm build` 和 `git diff --check`**
 
-- [ ] **Step 5: 启动本地 Vite，使用真实 Edge/Playwright 验证 1440×1000 与 390×844**
+结果：43 个测试文件、171 项测试全部通过；TypeScript 与 Vite 生产构建通过，`git diff --check` 无格式错误。
+
+- [x] **Step 5: 启动本地 Vite，使用真实 Edge/Playwright 验证 1440×1000 与 390×844**
 
 验收操作：打开岁时手册、切换三标签、查看节日和生日、选择 NPC 行程、精确跳到下一天 08:15、刷新确认日期保留；记录页面错误、横向溢出、重复 ID 和不可达控件，结果必须全部为零。
 
-- [ ] **Step 6: 更新 README 与计划文档，记录测试数量和浏览器结果**
+结果：两个视口的页面错误、横向溢出和重复 ID 均为 0；手机端表单可滚动到达；刷新后仍为第 1 年 1 月 2 日 08:15；播种通知在 2 秒前保持可见并在随后自动退出。
 
-- [ ] **Step 7: 请求代码审查并修复所有 Critical/Important 问题**
+- [x] **Step 6: 更新 README 与计划文档，记录测试数量和浏览器结果**
+
+- [x] **Step 7: 请求代码审查并修复所有 Critical/Important 问题**
+
+结果：独立审查无 Critical；3 个 Important 已全部修复并加入回归测试——地图按预计抵达时刻显示动态人物、异常年份钳制在安全范围、v2 迁移只补新增岁时世界书而不复活玩家删除的旧默认书。3 个 Minor 也一并处理。
 
 - [ ] **Step 8: 最终提交并推送**
 

@@ -42,6 +42,7 @@ export function LocationStage() {
   const presentNpcs = getNpcsAtLocation(state.location, state.year, state.day, state.minutes)
   const selectedNpc = npcs.find((npc) => npc.id === state.selectedNpcId)
   const feature = primaryModal[state.location]
+  const featureNpcId = location.npcIds.find((npcId) => presentNpcs.some((npc) => npc.id === npcId))
 
   useEffect(() => () => Object.values(uploads).forEach((source) => URL.revokeObjectURL?.(source)), [uploads])
 
@@ -55,7 +56,7 @@ export function LocationStage() {
       <div className="location-scene" style={{ backgroundImage: `url(${locationAtlas})` }} aria-hidden="true" />
       <div className="location-shade" aria-hidden="true" />
       <header className="stage-titlebar"><div><p className="eyebrow">{location.name} · {location.hours}</p><h1 id="stage-title">{location.subtitle}</h1></div><span className="weather-pill">{location.hours === '全天' ? '随时开放' : `开放 ${location.hours}`}</span></header>
-      <div className="location-story"><span>{location.name}</span><p>{location.description}</p>{feature && <button id={`location-feature-${state.location}`} className="primary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: feature.modal, npcId: presentNpcs[0]?.id })}>{feature.label}</button>}</div>
+      <div className="location-story"><span>{location.name}</span><p>{location.description}</p>{feature && <button id={`location-feature-${state.location}`} className="primary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: feature.modal, npcId: featureNpcId })}>{feature.label}</button>}</div>
       <div className={`npc-stage-list count-${presentNpcs.length}`} aria-label="当前地点人物">
         {presentNpcs.map((npc) => <NpcPortrait key={npc.id} npc={npc} relationship={state.relationships[npc.id]} uploadedSource={uploads[npc.id]} onUpload={(file) => upload(npc.id, file)} onOpen={() => dispatch({ type: 'OPEN_MODAL', modal: 'npc', npcId: npc.id })} />)}
         {!presentNpcs.length && <div className="empty-location-state"><strong>此刻无人停留</strong><p>村民会依照每日行程与节日安排在不同地点活动。</p></div>}

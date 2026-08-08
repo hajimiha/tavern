@@ -110,7 +110,7 @@ describe('雾灯谷酒馆仓储', () => {
     const settings = await repository.getSettings()
     const loran = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
     const customPersonality = '玩家保留的自定义性格'
-    await database.lorebooks.delete(calendarId)
+    await database.lorebooks.bulkDelete([calendarId, 'mistvale-world-rules', 'mistvale-village-archive'])
     await database.settings.put({
       ...settings,
       activeLorebookIds: settings.activeLorebookIds.filter((id) => id !== calendarId),
@@ -125,6 +125,8 @@ describe('雾灯谷酒馆仓储', () => {
     await repository.initialize()
 
     expect(await repository.getLorebook(calendarId)).toBeDefined()
+    expect(await repository.getLorebook('mistvale-world-rules')).toBeUndefined()
+    expect(await repository.getLorebook('mistvale-village-archive')).toBeUndefined()
     expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(calendarId)
     expect((await repository.getCharacter(loran.id))?.personality).toBe(customPersonality)
     expect((await repository.getSettings()).activeLorebookIds).toContain(calendarId)

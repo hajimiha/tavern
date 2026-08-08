@@ -52,13 +52,13 @@ class DexieTavernRepository implements TavernRepository {
         const storedSettings = await this.database.settings.get('mistvale-settings')
         const shouldPublishPack = Boolean(contentPack && storedSettings?.contentPackVersion !== contentPack.contentVersion)
         const shouldMigrateDefaults = (storedSettings?.defaultContentVersion ?? 1) < DEFAULT_CONTENT_VERSION
-        if ((await this.database.lorebooks.count()) === 0) {
+        if ((await this.database.lorebooks.count()) === 0 && !storedSettings) {
           await this.database.lorebooks.bulkAdd(mergeById(defaults.lorebooks, contentPack?.lorebooks ?? []))
         } else {
           if (shouldMigrateDefaults) {
             const existingIds = new Set((await this.database.lorebooks.toArray()).map((book) => book.id))
-            const missingDefaults = defaults.lorebooks.filter((book) => !existingIds.has(book.id))
-            if (missingDefaults.length) await this.database.lorebooks.bulkAdd(missingDefaults)
+            const calendarBook = defaults.lorebooks.find((book) => book.id === CALENDAR_FESTIVALS_ID)
+            if (calendarBook && !existingIds.has(CALENDAR_FESTIVALS_ID)) await this.database.lorebooks.add(calendarBook)
           }
           if (shouldPublishPack && contentPack?.lorebooks.length) await this.database.lorebooks.bulkPut(contentPack.lorebooks)
         }

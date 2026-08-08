@@ -1,5 +1,5 @@
 import { createInitialPlots, crops, npcs, quests, shopItems, spells } from './data'
-import { formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
+import { advanceCalendarClock, formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
 import {
   DEFAULT_GAME_RULES,
   canSpendEnergy,
@@ -86,11 +86,10 @@ export const initialGameState: GameState = {
 export function advanceGameClock(state: GameState, elapsedMinutes: number): GameState {
   if (!Number.isFinite(elapsedMinutes) || elapsedMinutes <= 0) return state
   const elapsed = Math.floor(elapsedMinutes)
-  const totalMinutes = state.minutes + elapsed
-  const crossedDays = Math.floor(totalMinutes / 1440)
-  const absoluteDay = (state.year - 1) * 365 + state.day - 1 + crossedDays
-  const year = Math.floor(absoluteDay / 365) + 1
-  const day = absoluteDay % 365 + 1
+  const target = advanceCalendarClock(state.year, state.day, state.minutes, elapsed)
+  const crossedDays = (target.year - state.year) * 365 + target.day - state.day
+  const actualElapsed = crossedDays * 1440 + target.minutes - state.minutes
+  if (actualElapsed <= 0) return state
   const relationships = crossedDays > 0
     ? Object.fromEntries(Object.entries(state.relationships).map(([id, relationship]) => [id, {
       ...relationship,
@@ -101,15 +100,15 @@ export function advanceGameClock(state: GameState, elapsedMinutes: number): Game
 
   return {
     ...state,
-    year,
-    day,
-    minutes: totalMinutes % 1440,
-    season: getSeasonForDay(day),
-    weekday: getWeekday(year, day),
+    year: target.year,
+    day: target.day,
+    minutes: target.minutes,
+    season: getSeasonForDay(target.day),
+    weekday: getWeekday(target.year, target.day),
     energy: crossedDays > 0 ? state.maxEnergy : state.energy,
     hospitalUsedToday: crossedDays > 0 ? false : state.hospitalUsedToday,
     relationships,
-    plots: advancePlots(state, elapsed),
+    plots: advancePlots(state, actualElapsed),
   }
 }
 
@@ -149,6 +148,7 @@ function reduceGameState(state: GameState, action: GameAction): GameState {
       return { ...advanced, location: action.location }
     }
     case 'ADVANCE_TIME': {
+      if (state.battle) return state
       if (!Number.isFinite(action.minutes) || action.minutes <= 0) {
         return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '无法消磨时间', message: '请选择大于零的有效时长。' })] }
       }

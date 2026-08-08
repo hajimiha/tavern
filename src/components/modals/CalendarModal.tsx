@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useGame } from '../../game/GameContext'
 import {
+  advanceCalendarClock,
   formatClock,
   formatGameDate,
   getCalendarDate,
@@ -20,17 +21,6 @@ function clampInteger(raw: string, minimum: number, maximum: number) {
   const parsed = Number(raw)
   if (!Number.isFinite(parsed)) return minimum
   return Math.min(maximum, Math.max(minimum, Math.floor(parsed)))
-}
-
-function advanceDate(year: number, day: number, minutes: number, elapsedMinutes: number) {
-  const totalMinutes = minutes + elapsedMinutes
-  const crossedDays = Math.floor(totalMinutes / 1440)
-  const absoluteDay = (year - 1) * 365 + day - 1 + crossedDays
-  return {
-    year: Math.floor(absoluteDay / 365) + 1,
-    day: absoluteDay % 365 + 1,
-    minutes: totalMinutes % 1440,
-  }
 }
 
 export function CalendarModal() {
@@ -71,14 +61,14 @@ export function CalendarModal() {
     const difference = target - state.minutes
     return difference <= 0 ? difference + 1440 : difference
   }, [targetTime, state.minutes])
-  const exactTarget = advanceDate(state.year, state.day, state.minutes, exactElapsed)
+  const exactTarget = advanceCalendarClock(state.year, state.day, state.minutes, exactElapsed)
 
   const durationTotal = (
     clampInteger(durationDays, 0, 365) * 1440
     + clampInteger(durationHours, 0, 23) * 60
     + clampInteger(durationMinutes, 0, 59)
   )
-  const durationTarget = advanceDate(state.year, state.day, state.minutes, durationTotal)
+  const durationTarget = advanceCalendarClock(state.year, state.day, state.minutes, durationTotal)
   const durationValid = durationTotal > 0 && durationTotal <= 365 * 1440
   const blocked = Boolean(state.battle)
 

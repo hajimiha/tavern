@@ -8,7 +8,8 @@ import {
   type PointerEvent,
 } from 'react'
 import villageMapImage from '../../assets/pixel/village-map.webp'
-import { locations, npcs } from '../../game/data'
+import { advanceCalendarClock, getNpcsAtLocation } from '../../game/calendar'
+import { locations } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 import type { Location } from '../../game/types'
 import { GameIcon } from '../icons/GameIcon'
@@ -33,6 +34,12 @@ export function VillageMap() {
   const [destination, setDestination] = useState<Location | null>(null)
   const [viewportSize, setViewportSize] = useState<MapSize>(DEFAULT_VIEWPORT)
   const [worldSize, setWorldSize] = useState<MapSize>(DEFAULT_WORLD)
+  const arrival = destination
+    ? advanceCalendarClock(state.year, state.day, state.minutes, destination.travelMinutes)
+    : null
+  const expectedNpcs = destination && arrival
+    ? getNpcsAtLocation(destination.id, arrival.year, arrival.day, arrival.minutes)
+    : []
   const [offset, setOffset] = useState<MapPoint>(() => clampMapOffset({ x: -180, y: -120 }, DEFAULT_VIEWPORT, DEFAULT_WORLD))
   const [isDragging, setIsDragging] = useState(false)
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -273,7 +280,7 @@ export function VillageMap() {
           <dl>
             <div><dt>路程</dt><dd>{destination.travelMinutes} 分钟</dd></div>
             <div><dt>开放</dt><dd>{destination.hours}</dd></div>
-            <div><dt>在场</dt><dd>{destination.npcIds.length ? destination.npcIds.map((id) => npcs.find((npc) => npc.id === id)?.name).join('、') : '无人常驻'}</dd></div>
+            <div><dt>预计在场</dt><dd>{expectedNpcs.length ? expectedNpcs.map((npc) => npc.name).join('、') : '暂无人物'}</dd></div>
           </dl>
           <button id={`travel-confirm-${destination.id}`} className="primary-button travel-confirm" type="button" disabled={destinationIsCurrent} aria-label={destinationIsCurrent ? `已在${destination.name}` : `确认前往${destination.name}`} onClick={confirmTravel}>{destinationIsCurrent ? '已在此处' : '确认出发'}</button>
         </section>

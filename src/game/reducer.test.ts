@@ -202,6 +202,15 @@ describe('游戏状态变更', () => {
     expect(later.toasts[0].title).toBe('时间流逝')
   })
 
+  it('战斗期间拒绝从非界面入口消磨时间', () => {
+    const fighting = {
+      ...initialGameState,
+      battle: { floor: 1, enemyName: '穴居史莱姆', enemyElement: 'earth' as const, enemyHealth: 20, enemyMaxHealth: 20, turn: 1, log: [] },
+    }
+    const unchanged = gameReducer(fighting, { type: 'ADVANCE_TIME', minutes: 60, reason: '错误调用' })
+    expect(unchanged).toBe(fighting)
+  })
+
   it('生日当天偏爱礼物获得双倍基础好感，其他日期保持原收益', () => {
     const liuan = npcs.find((npc) => npc.id === 'liuan')!
     const birthday = getDayOfYear(liuan.birthday.month, liuan.birthday.day)

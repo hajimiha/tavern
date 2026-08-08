@@ -3,6 +3,7 @@ import type { Festival, LocationId, NpcDailySchedule, ScheduleSegment, Season } 
 
 export const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
 export const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'] as const
+export const MAX_GAME_YEAR = 9999
 
 export interface CalendarDate {
   year: number
@@ -47,7 +48,7 @@ export function getSeasonForDay(day: number): Season {
 }
 
 function getWeekdayIndex(year: number, day: number): number {
-  const safeYear = Math.max(1, Math.floor(year))
+  const safeYear = clampInteger(year, 1, MAX_GAME_YEAR)
   const safeDay = clampInteger(day, 1, 365)
   return ((safeYear - 1) * 365 + safeDay - 1) % WEEKDAYS.length
 }
@@ -57,7 +58,7 @@ export function getWeekday(year: number, day: number): string {
 }
 
 export function getCalendarDate(year: number, day: number): CalendarDate {
-  const safeYear = Math.max(1, Math.floor(Number.isFinite(year) ? year : 1))
+  const safeYear = clampInteger(year, 1, MAX_GAME_YEAR)
   const dayOfYear = clampInteger(day, 1, 365)
   const { month, date } = getMonthAndDate(dayOfYear)
   return {
@@ -67,6 +68,22 @@ export function getCalendarDate(year: number, day: number): CalendarDate {
     date,
     season: getSeasonForDay(dayOfYear),
     weekday: getWeekday(safeYear, dayOfYear),
+  }
+}
+
+export function advanceCalendarClock(year: number, day: number, minutes: number, elapsedMinutes: number) {
+  const safeYear = clampInteger(year, 1, MAX_GAME_YEAR)
+  const safeDay = clampInteger(day, 1, 365)
+  const safeMinutes = clampInteger(minutes, 0, 1439)
+  const elapsed = Math.floor(Number.isFinite(elapsedMinutes) ? Math.max(0, elapsedMinutes) : 0)
+  const currentAbsoluteMinute = (((safeYear - 1) * 365 + safeDay - 1) * 1440) + safeMinutes
+  const maximumAbsoluteMinute = MAX_GAME_YEAR * 365 * 1440 - 1
+  const targetAbsoluteMinute = Math.min(maximumAbsoluteMinute, currentAbsoluteMinute + elapsed)
+  const absoluteDay = Math.floor(targetAbsoluteMinute / 1440)
+  return {
+    year: Math.floor(absoluteDay / 365) + 1,
+    day: absoluteDay % 365 + 1,
+    minutes: targetAbsoluteMinute % 1440,
   }
 }
 
