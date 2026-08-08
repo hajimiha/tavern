@@ -328,13 +328,13 @@ git push origin main
 - Modify: `progress.md`
 
 **Interfaces:**
-- Produces: 最多三条可见通知、4.5 秒自动关闭、连续同内容去重。
+- Produces: 最多三条可见通知、每条挂载后 2 秒独立自动关闭、连续同内容去重。
 
 - [ ] **Step 1: 写通知可见上限、自动关闭与 reducer 去重失败测试**
 
 ```tsx
 expect(screen.getAllByRole('article')).toHaveLength(3)
-vi.advanceTimersByTime(4500)
+vi.advanceTimersByTime(2000)
 expect(dispatch).toHaveBeenCalledWith({ type: 'DISMISS_TOAST', id: 'notice-1' })
 ```
 
@@ -346,7 +346,9 @@ expect(twice.toasts).toHaveLength(1)
 
 - [ ] **Step 2: 运行通知测试并确认截图中的无限堆叠问题可复现**
 
-- [ ] **Step 3: 实现去重、最多三条渲染和自动退出**
+- [ ] **Step 3: 实现去重、最多三条渲染和 2 秒自动退出**
+
+为每条 toast 使用独立的子组件计时器，计时 effect 只依赖该 toast 的 `id` 与稳定 `dispatch`；新 toast 加入时不能重新启动已显示 toast 的 2 秒计时器。组件卸载时清理自己的 timeout。
 
 - [ ] **Step 4: 运行定向测试、`pnpm test:run`、`pnpm build` 和 `git diff --check`**
 
