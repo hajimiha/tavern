@@ -203,6 +203,7 @@ export type ModalType =
   | null
 
 export interface GameState {
+  year: number
   day: number
   season: Season
   weekday: string
@@ -239,6 +240,7 @@ export type GameAction =
   | { type: 'OPEN_MODAL'; modal: Exclude<ModalType, null>; npcId?: string; plotId?: string }
   | { type: 'CLOSE_MODAL' }
   | { type: 'TRAVEL_TO_LOCATION'; location: LocationId; minutes: number }
+  | { type: 'ADVANCE_TIME'; minutes: number; reason: string }
   | { type: 'PLANT_PLOT'; plotId: string; seedId: string }
   | { type: 'WATER_PLOT'; plotId: string }
   | { type: 'FERTILIZE_PLOT'; plotId: string }

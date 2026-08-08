@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { getDayOfYear } from './calendar'
+import { npcs } from './data'
 import { gameReducer, initialGameState } from './reducer'
 import { DEFAULT_GAME_RULES } from './rules'
 
 describe('游戏状态变更', () => {
   it('以刚抵达小镇的新手数据开始游戏', () => {
     expect(initialGameState).toMatchObject({
+      year: 1,
       day: 1,
       season: '春',
       weekday: '周一',
@@ -158,5 +161,56 @@ describe('游戏状态变更', () => {
     expect(gameReducer(plantedPlotState, { type: 'PLANT_PLOT', plotId: 'plot-1-1', seedId: 'moon-radish-seed' }).inventory['moon-radish-seed']).toBe(8)
     expect(gameReducer(initialGameState, { type: 'PLANT_PLOT', plotId: 'plot-1-1', seedId: 'sun-wheat-seed' }).toasts.at(-1)?.title).toBe('播种未完成')
     expect(gameReducer({ ...initialGameState, inventory: {} }, { type: 'PLANT_PLOT', plotId: 'plot-1-1', seedId: 'moon-radish-seed' }).plots[0].cropId).toBeUndefined()
+  })
+
+  it('旅行跨过午夜时同步推进日期、星期和每日状态', () => {
+    const state = {
+      ...initialGameState,
+      minutes: 23 * 60 + 50,
+      energy: 1,
+      hospitalUsedToday: true,
+      relationships: {
+        ...initialGameState.relationships,
+        loran: { ...initialGameState.relationships.loran, chattedToday: true, giftedToday: true },
+      },
+    }
+    const crossed = gameReducer(state, { type: 'TRAVEL_TO_LOCATION', location: 'library', minutes: 20 })
+
+    expect(crossed).toMatchObject({ year: 1, day: 2, minutes: 10, weekday: '周二', season: '春', energy: 5, hospitalUsedToday: false })
+    expect(crossed.relationships.loran).toMatchObject({ chattedToday: false, giftedToday: false })
+  })
+
+  it('消磨多日时一次推进作物、恢复每日状态并生成单条摘要', () => {
+    const state = {
+      ...initialGameState,
+      energy: 1,
+      hospitalUsedToday: true,
+      plots: initialGameState.plots.map((plot, index) => index === 0 ? { ...plot, cropId: 'moon-radish', remainingHours: 50, ready: false } : plot),
+      relationships: {
+        ...initialGameState.relationships,
+        loran: { ...initialGameState.relationships.loran, chattedToday: true },
+      },
+      toasts: [],
+    }
+    const action = { type: 'ADVANCE_TIME', minutes: 2 * 1440 + 180, reason: '整理农场手记' } as unknown as Parameters<typeof gameReducer>[1]
+    const later = gameReducer(state, action)
+
+    expect(later).toMatchObject({ year: 1, day: 3, minutes: 570, energy: 5, hospitalUsedToday: false })
+    expect(later.relationships.loran.chattedToday).toBe(false)
+    expect(later.plots[0]).toMatchObject({ remainingHours: 0, ready: true })
+    expect(later.toasts).toHaveLength(1)
+    expect(later.toasts[0].title).toBe('时间流逝')
+  })
+
+  it('生日当天偏爱礼物获得双倍基础好感，其他日期保持原收益', () => {
+    const liuan = npcs.find((npc) => npc.id === 'liuan')!
+    const birthday = getDayOfYear(liuan.birthday.month, liuan.birthday.day)
+    const giftState = { ...initialGameState, inventory: { ...initialGameState.inventory, 'amber-tea': 2 } }
+    const birthdayResult = gameReducer({ ...giftState, day: birthday }, { type: 'GIVE_GIFT', npcId: 'liuan', itemId: 'amber-tea', affinity: 14 })
+    const ordinaryResult = gameReducer({ ...giftState, day: birthday + 1 }, { type: 'GIVE_GIFT', npcId: 'liuan', itemId: 'amber-tea', affinity: 14 })
+
+    expect(birthdayResult.relationships.liuan.affinity).toBe(28)
+    expect(birthdayResult.toasts.at(-1)?.message).toContain('生日心意')
+    expect(ordinaryResult.relationships.liuan.affinity).toBe(14)
   })
 })

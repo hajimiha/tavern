@@ -6,6 +6,7 @@ import {
   loadGameSave,
   parseGameSave,
   saveGameState,
+  sanitizeGameState,
   serializeGameSave,
 } from './game-save-storage'
 
@@ -76,6 +77,23 @@ describe('版本化游戏自动存档', () => {
     expect(imported?.state.mine).toEqual(initialGameState.mine)
     expect(imported?.state.battle).toBeUndefined()
     expect(imported?.state.fishing.active).toBe(false)
+  })
+
+  it('为旧存档补入第一年并将异常日历字段钳制到有效范围', () => {
+    const legacyState = { ...initialGameState } as unknown as Record<string, unknown>
+    delete legacyState.year
+    const legacy = parseGameSave(JSON.stringify({ schemaVersion: 1, savedAt: 1, state: legacyState }))
+    expect((legacy?.state as unknown as { year?: number })?.year).toBe(1)
+
+    const sanitized = sanitizeGameState({
+      ...initialGameState,
+      year: -2,
+      day: 999,
+      minutes: 99999,
+      season: '春',
+      weekday: '周一',
+    } as never)
+    expect(sanitized).toMatchObject({ year: 1, day: 365, minutes: 1439, season: '冬', weekday: '周一' })
   })
 
   it('浏览器拒绝存储访问时不会中断游戏，也不会伪报保存成功', () => {

@@ -1,4 +1,5 @@
 import { createInitialPlots, crops, npcs, quests, shopItems, spells } from './data'
+import { formatGameDate, getSeasonForDay, getWeekday, isNpcBirthday } from './calendar'
 import {
   DEFAULT_GAME_RULES,
   canSpendEnergy,
@@ -46,6 +47,7 @@ function advancePlots(state: GameState, elapsedMinutes: number): GameState['plot
 }
 
 export const initialGameState: GameState = {
+  year: 1,
   day: 1,
   season: '春',
   weekday: '周一',
@@ -81,6 +83,36 @@ export const initialGameState: GameState = {
   toasts: [],
 }
 
+export function advanceGameClock(state: GameState, elapsedMinutes: number): GameState {
+  if (!Number.isFinite(elapsedMinutes) || elapsedMinutes <= 0) return state
+  const elapsed = Math.floor(elapsedMinutes)
+  const totalMinutes = state.minutes + elapsed
+  const crossedDays = Math.floor(totalMinutes / 1440)
+  const absoluteDay = (state.year - 1) * 365 + state.day - 1 + crossedDays
+  const year = Math.floor(absoluteDay / 365) + 1
+  const day = absoluteDay % 365 + 1
+  const relationships = crossedDays > 0
+    ? Object.fromEntries(Object.entries(state.relationships).map(([id, relationship]) => [id, {
+      ...relationship,
+      chattedToday: false,
+      giftedToday: false,
+    }])) as GameState['relationships']
+    : state.relationships
+
+  return {
+    ...state,
+    year,
+    day,
+    minutes: totalMinutes % 1440,
+    season: getSeasonForDay(day),
+    weekday: getWeekday(year, day),
+    energy: crossedDays > 0 ? state.maxEnergy : state.energy,
+    hospitalUsedToday: crossedDays > 0 ? false : state.hospitalUsedToday,
+    relationships,
+    plots: advancePlots(state, elapsed),
+  }
+}
+
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'REPLACE_GAME_STATE':
@@ -112,13 +144,25 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, activeModal: action.modal, selectedNpcId: action.npcId, selectedPlotId: action.plotId }
     case 'CLOSE_MODAL':
       return { ...state, activeModal: null, selectedNpcId: undefined, selectedPlotId: undefined }
-    case 'TRAVEL_TO_LOCATION':
-      return {
-        ...state,
-        location: action.location,
-        minutes: state.minutes + action.minutes,
-        plots: advancePlots(state, action.minutes),
+    case 'TRAVEL_TO_LOCATION': {
+      const advanced = advanceGameClock(state, action.minutes)
+      return { ...advanced, location: action.location }
+    }
+    case 'ADVANCE_TIME': {
+      if (!Number.isFinite(action.minutes) || action.minutes <= 0) {
+        return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '无法消磨时间', message: '请选择大于零的有效时长。' })] }
       }
+      const elapsed = Math.min(Math.floor(action.minutes), 365 * 1440)
+      const advanced = advanceGameClock(state, elapsed)
+      return {
+        ...advanced,
+        toasts: [...advanced.toasts, makeToast({
+          tone: 'info',
+          title: '时间流逝',
+          message: `${action.reason}。现在是${formatGameDate(advanced.year, advanced.day)} ${String(Math.floor(advanced.minutes / 60)).padStart(2, '0')}:${String(advanced.minutes % 60).padStart(2, '0')}。`,
+        })],
+      }
+    }
     case 'PLANT_PLOT': {
       const plot = state.plots.find((item) => item.id === action.plotId)
       const seed = shopItems.find((item) => item.id === action.seedId && item.category === 'seed')
@@ -139,7 +183,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         plots: state.plots.map((item) => item.id === plot.id ? {
           ...item,
           cropId: crop.id,
-          plantedAt: (state.day - 1) * 1440 + state.minutes,
+          plantedAt: ((state.year - 1) * 365 + state.day - 1) * 1440 + state.minutes,
           remainingHours,
           watered: false,
           fertilized: false,
@@ -204,14 +248,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         const message = state.energy < cost ? '精力不足，无法赠礼。' : relationship.giftedToday ? '今天已经向她赠过礼物。' : '背包里没有这件礼物。'
         return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '赠礼未完成', message })] }
       }
-      const affinityGain = scaleReward(action.affinity, state.rules.affinityMultiplier)
+      const birthday = isNpcBirthday(action.npcId, state.day)
+      const affinityGain = scaleReward(action.affinity * (birthday ? 2 : 1), state.rules.affinityMultiplier)
       const affinity = relationship.affinity + affinityGain
       return {
         ...state,
         energy: state.energy - cost,
         inventory: { ...state.inventory, [action.itemId]: state.inventory[action.itemId] - 1 },
         relationships: { ...state.relationships, [action.npcId]: { ...relationship, affinity, stage: affinityStage(affinity), giftedToday: true, memoryTags: [...relationship.memoryTags, '收到用心挑选的礼物'] } },
-        toasts: [...state.toasts, makeToast({ tone: 'success', title: '心意送达', message: `好感提升了 ${affinityGain} 点。` })],
+        toasts: [...state.toasts, makeToast({ tone: 'success', title: '心意送达', message: birthday ? `生日心意让好感提升了 ${affinityGain} 点。` : `好感提升了 ${affinityGain} 点。` })],
       }
     }
     case 'SUBMIT_QUEST': {
@@ -333,8 +378,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       log.push(action.action === 'defend' ? `你架起防御，只受到 ${enemyDamage} 点伤害。` : `${battle.enemyName}反击，造成 ${enemyDamage} 点伤害。`)
       return { ...state, stats: { ...state.stats, health: playerHealth, mana: playerMana }, inventory, battle: { ...battle, enemyHealth, turn: battle.turn + 1, ended: playerHealth <= 0 ? 'defeat' : undefined, log } }
     }
-    case 'PLAYER_DEFEATED':
-      return { ...state, day: state.day + 1, minutes: 6 * 60 + 30, location: 'farm', energy: state.maxEnergy, stats: { ...state.stats, health: state.stats.maxHealth, mana: state.stats.maxMana }, plots: advancePlots(state, Math.max(0, 24 * 60 - state.minutes) + 6 * 60 + 30), mine: { ...state.mine, currentFloor: 1 }, hospitalUsedToday: false, activeModal: null, battle: undefined, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '翌日苏醒', message: '你在农场床上醒来，精力、生命与魔力已经恢复。' })] }
+    case 'PLAYER_DEFEATED': {
+      const awakened = advanceGameClock(state, Math.max(0, 24 * 60 - state.minutes) + 6 * 60 + 30)
+      return { ...awakened, location: 'farm', energy: state.maxEnergy, stats: { ...state.stats, health: state.stats.maxHealth, mana: state.stats.maxMana }, mine: { ...state.mine, currentFloor: 1 }, hospitalUsedToday: false, activeModal: null, battle: undefined, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '翌日苏醒', message: '你在农场床上醒来，精力、生命与魔力已经恢复。' })] }
+    }
     case 'START_FISHING':
       if (state.energy < getEnergyCost(1, state.rules.energyCostMode)) return { ...state, toasts: [...state.toasts, makeToast({ tone: 'warning', title: '精力不足', message: `需要 ${getEnergyCost(1, state.rules.energyCostMode)} 点精力才能抛竿。` })] }
       return { ...state, energy: state.energy - getEnergyCost(1, state.rules.energyCostMode), fishing: { active: true } }

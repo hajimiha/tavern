@@ -1,4 +1,5 @@
 import { locations, spells } from './data'
+import { getSeasonForDay, getWeekday } from './calendar'
 import { initialGameState } from './reducer'
 import { normalizeGameRules } from './rules'
 import type { AffinityStage, GameState, LocationId, Relationship, SkillId } from './types'
@@ -30,7 +31,6 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
     typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= minimum ? candidate : fallback
   const integer = (candidate: unknown, fallback: number, minimum = 0) => Math.floor(number(candidate, fallback, minimum))
   const boolean = (candidate: unknown, fallback: boolean) => typeof candidate === 'boolean' ? candidate : fallback
-  const text = (candidate: unknown, fallback = '') => typeof candidate === 'string' ? candidate : fallback
   const stringList = (candidate: unknown) => Array.isArray(candidate)
     ? candidate.filter((item): item is string => typeof item === 'string').slice(0, 200)
     : []
@@ -106,13 +106,16 @@ export function sanitizeGameState(value: Partial<GameState>): GameState {
   const toolLevel = (candidate: unknown, fallback: number) => Math.min(4, integer(candidate, fallback, 1))
   const rawFishing: Record<string, unknown> = isObject(value.fishing) ? value.fishing : {}
   const knownSpellIds = new Set(spells.map((spell) => spell.id))
+  const year = integer(value.year, initialGameState.year, 1)
+  const day = Math.min(365, integer(value.day, initialGameState.day, 1))
 
   return {
     ...initialGameState,
-    day: integer(value.day, initialGameState.day, 1),
-    season: (['春', '夏', '秋', '冬'] as const).includes(value.season as GameState['season']) ? value.season as GameState['season'] : initialGameState.season,
-    weekday: text(value.weekday, initialGameState.weekday),
-    minutes: integer(value.minutes, initialGameState.minutes),
+    year,
+    day,
+    season: getSeasonForDay(day),
+    weekday: getWeekday(year, day),
+    minutes: Math.min(1439, integer(value.minutes, initialGameState.minutes)),
     weather: (['薄雾', '晴', '雨'] as const).includes(value.weather as GameState['weather']) ? value.weather as GameState['weather'] : initialGameState.weather,
     location,
     energy: Math.min(integer(value.energy, initialGameState.energy), maxEnergy),

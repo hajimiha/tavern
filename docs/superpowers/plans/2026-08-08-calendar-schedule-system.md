@@ -101,7 +101,7 @@ git push origin main
 - Produces: `GameState.year`、`ADVANCE_TIME` action。
 - Produces: `advanceGameClock(state, elapsedMinutes)`，供旅行、消磨时间与战败复苏复用。
 
-- [ ] **Step 1: 写旅行跨午夜和多日推进失败测试**
+- [x] **Step 1: 写旅行跨午夜和多日推进失败测试**
 
 ```ts
 const crossed = gameReducer({ ...initialGameState, minutes: 23 * 60 + 50 }, { type: 'TRAVEL_TO_LOCATION', location: 'library', minutes: 20 })
@@ -112,9 +112,9 @@ expect(later).toMatchObject({ day: 3, minutes: 480, energy: 5, hospitalUsedToday
 expect(later.relationships.loran.chattedToday).toBe(false)
 ```
 
-- [ ] **Step 2: 运行 reducer 定向测试并确认红灯**
+- [x] **Step 2: 运行 reducer 定向测试并确认红灯**
 
-- [ ] **Step 3: 实现中央推进并让旅行、战败调用它**
+- [x] **Step 3: 实现中央推进并让旅行、战败调用它**
 
 ```ts
 function advanceGameClock(state: GameState, elapsedMinutes: number): GameState {
@@ -129,7 +129,7 @@ function advanceGameClock(state: GameState, elapsedMinutes: number): GameState {
 
 跨日时重置 `chattedToday`、`giftedToday`、`hospitalUsedToday`，恢复精力，并保持作物按 `elapsedMinutes` 推进。`ADVANCE_TIME` 成功只添加一条“时间流逝”通知。
 
-- [ ] **Step 4: 写生日赠礼与非生日赠礼失败测试**
+- [x] **Step 4: 写生日赠礼与非生日赠礼失败测试**
 
 ```ts
 const birthday = getDayOfYear(npcs.find((npc) => npc.id === 'liuan')!.birthday.month, npcs.find((npc) => npc.id === 'liuan')!.birthday.day)
@@ -137,20 +137,20 @@ const result = gameReducer({ ...seededGiftState, day: birthday }, { type: 'GIVE_
 expect(result.relationships.liuan.affinity).toBe(28)
 ```
 
-- [ ] **Step 5: 实现生日双倍收益和通知文案**
+- [x] **Step 5: 实现生日双倍收益和通知文案**
 
-- [ ] **Step 6: 写旧存档迁移与异常日期净化失败测试**
+- [x] **Step 6: 写旧存档迁移与异常日期净化失败测试**
 
 ```ts
 expect(parseGameSave(JSON.stringify({ schemaVersion: 1, savedAt: 1, state: initialGameState }))?.state.year).toBe(1)
 expect(sanitizeGameState({ ...initialGameState, year: -2, day: 999, minutes: 99999 })).toMatchObject({ year: 1, day: 365, minutes: 1439 })
 ```
 
-- [ ] **Step 7: 实现 `year` 迁移、日期钳制和派生字段修复**
+- [x] **Step 7: 实现 `year` 迁移、日期钳制和派生字段修复**
 
-- [ ] **Step 8: 运行 reducer 与存档测试并确认通过**
+- [x] **Step 8: 运行 reducer 与存档测试并确认通过**
 
-- [ ] **Step 9: 提交并推送**
+- [x] **Step 9: 提交并推送**
 
 ```powershell
 git add src/game/types.ts src/game/reducer.ts src/game/reducer.test.ts src/game/game-save-storage.ts src/game/game-save-storage.test.ts
