@@ -213,4 +213,17 @@ describe('游戏状态变更', () => {
     expect(birthdayResult.toasts.at(-1)?.message).toContain('生日心意')
     expect(ordinaryResult.relationships.liuan.affinity).toBe(14)
   })
+
+  it('合并连续重复通知并把通知队列限制为三条', () => {
+    const repeated = { type: 'ADD_TOAST', toast: { tone: 'success', title: '播种完成', message: '月铃萝卜将在 56 小时后成熟。' } } as const
+    const once = gameReducer({ ...initialGameState, toasts: [] }, repeated)
+    const twice = gameReducer(once, repeated)
+    expect(twice.toasts).toHaveLength(1)
+    expect(twice.toasts[0].id).toBe(once.toasts[0].id)
+
+    const filled = ['一', '二', '三', '四'].reduce<Parameters<typeof gameReducer>[0]>((state, title) => gameReducer(state, {
+      type: 'ADD_TOAST', toast: { tone: 'info', title, message: `${title}号通知` },
+    }), { ...initialGameState, toasts: [] })
+    expect(filled.toasts.map((toast) => toast.title)).toEqual(['二', '三', '四'])
+  })
 })

@@ -333,7 +333,7 @@ git push origin main
 **Interfaces:**
 - Produces: 最多三条可见通知、每条挂载后 2 秒独立自动关闭、连续同内容去重。
 
-- [ ] **Step 1: 写通知可见上限、自动关闭与 reducer 去重失败测试**
+- [x] **Step 1: 写通知可见上限、自动关闭与 reducer 去重失败测试**
 
 ```tsx
 expect(screen.getAllByRole('article')).toHaveLength(3)
@@ -347,9 +347,9 @@ const twice = gameReducer(once, repeatedToastAction)
 expect(twice.toasts).toHaveLength(1)
 ```
 
-- [ ] **Step 2: 运行通知测试并确认截图中的无限堆叠问题可复现**
+- [x] **Step 2: 运行通知测试并确认截图中的无限堆叠问题可复现**
 
-- [ ] **Step 3: 实现去重、最多三条渲染和 2 秒自动退出**
+- [x] **Step 3: 实现去重、最多三条渲染和 2 秒自动退出**
 
 为每条 toast 使用独立的子组件计时器，计时 effect 只依赖该 toast 的 `id` 与稳定 `dispatch`；新 toast 加入时不能重新启动已显示 toast 的 2 秒计时器。组件卸载时清理自己的 timeout。
 

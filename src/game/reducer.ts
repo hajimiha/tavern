@@ -113,7 +113,7 @@ export function advanceGameClock(state: GameState, elapsedMinutes: number): Game
   }
 }
 
-export function gameReducer(state: GameState, action: GameAction): GameState {
+function reduceGameState(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'REPLACE_GAME_STATE':
       return action.state
@@ -413,4 +413,27 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     default:
       return state
   }
+}
+
+function sameToastContent(left: ToastMessage, right: ToastMessage) {
+  return left.tone === right.tone && left.title === right.title && left.message === right.message
+}
+
+function reconcileToastQueue(previous: GameState, next: GameState): GameState {
+  if (next.toasts === previous.toasts) return next
+  const nextIds = new Set(next.toasts.map((toast) => toast.id))
+  const previousIds = new Set(previous.toasts.map((toast) => toast.id))
+  let queue = previous.toasts.filter((toast) => nextIds.has(toast.id)).slice(-3)
+  const added = next.toasts.filter((toast) => !previousIds.has(toast.id))
+  for (const toast of added) {
+    if (queue.length && sameToastContent(queue[queue.length - 1], toast)) continue
+    queue = [...queue, toast].slice(-3)
+  }
+  return { ...next, toasts: queue }
+}
+
+export function gameReducer(state: GameState, action: GameAction): GameState {
+  const next = reduceGameState(state, action)
+  if (action.type === 'REPLACE_GAME_STATE') return next
+  return reconcileToastQueue(state, next)
 }
