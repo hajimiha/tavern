@@ -219,7 +219,7 @@ git push origin main
 - Consumes: Task 1 calendar API and Task 2 `ADVANCE_TIME`。
 - Produces: `calendar` managed modal with tabs `month`, `schedule`, `pass-time`。
 
-- [ ] **Step 1: 写月历事件、生日标记和标签切换失败测试**
+- [x] **Step 1: 写月历事件、生日标记和标签切换失败测试**
 
 ```tsx
 expect(screen.getByRole('heading', { name: '岁时手册' })).toBeInTheDocument()
@@ -229,13 +229,13 @@ await user.click(screen.getByRole('tab', { name: '人物行程' }))
 expect(screen.getByText('当前所在')).toBeInTheDocument()
 ```
 
-- [ ] **Step 2: 运行组件测试并确认模态不存在**
+- [x] **Step 2: 运行组件测试并确认模态不存在**
 
-- [ ] **Step 3: 实现月历和人物行程标签**
+- [x] **Step 3: 实现月历和人物行程标签**
 
 月历使用语义化 `table`/`grid` 结构、七列星期标题、日期按钮和文字型事件详情；人物行程使用角色选择器与完整纵向时间轴，当前段设置 `aria-current="time"`。
 
-- [ ] **Step 4: 写两种时间推进表单失败测试**
+- [x] **Step 4: 写两种时间推进表单失败测试**
 
 ```tsx
 await user.click(screen.getByRole('tab', { name: '消磨时间' }))
@@ -246,15 +246,15 @@ await user.click(screen.getByRole('button', { name: '确认消磨时间' }))
 expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'ADVANCE_TIME', minutes: expect.any(Number) }))
 ```
 
-- [ ] **Step 5: 实现指定时刻和持续时长受控表单**
+- [x] **Step 5: 实现指定时刻和持续时长受控表单**
 
 指定时刻早于或等于当前时间时跳到次日；持续时长支持 0–365 天、0–23 小时、0–59 分钟且总时长必须大于零。战斗存在时按钮禁用并显示原因。日期详情在节日当天提供“前往会场”按钮。
 
-- [ ] **Step 6: 添加精细像素月历样式与响应式布局**
+- [x] **Step 6: 添加精细像素月历样式与响应式布局**
 
 桌面双栏、手机单列；所有日期按钮、标签和提交按钮高度至少 44px；事件、生日和今天同时存在时用图标加文字/边框区分，不只依赖颜色；动效只使用 `opacity` 与 `transform`。
 
-- [ ] **Step 7: 运行 CalendarModal、ModalHost 与 TopHud 测试并确认通过**
+- [x] **Step 7: 运行 CalendarModal、ModalHost 与 TopHud 测试并确认通过**
 
 - [ ] **Step 8: 提交并推送**
 

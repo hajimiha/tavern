@@ -14,6 +14,7 @@ import { BattleModal } from './BattleModal'
 import { FishingModal } from './FishingModal'
 import { TavernHubModal } from '../SillyTavern/TavernHubModal'
 import { SettingsModal } from './SettingsModal'
+import { CalendarModal } from './CalendarModal'
 
 const unmanaged = new Set<ModalType>([null, 'plot', 'npc', 'dialogue'])
 const titles: Partial<Record<Exclude<ModalType, null>, string>> = {
@@ -36,6 +37,7 @@ function contentFor(type: Exclude<ModalType, null>, close: () => void): ReactNod
   if (type === 'tavern') return <TavernHubModal onClose={close} />
   if (type === 'inventory') return <InventoryModal />
   if (type === 'settings') return <SettingsModal />
+  if (type === 'calendar') return <CalendarModal />
   if (type === 'journal') return <QuestModal journal />
   if (type === 'quest-board') return <QuestModal />
   if (type === 'trade') return <TradeModal />

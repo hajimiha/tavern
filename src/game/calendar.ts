@@ -206,6 +206,26 @@ export function getNpcSchedule(npcId: string, year: number, day: number): Schedu
   return schedule.weeklyOverrides?.[getWeekdayIndex(year, day)] ?? schedule.defaultSegments
 }
 
+export function getNpcScheduleForDay(npcId: string, year: number, day: number): ScheduleSegment[] {
+  const schedule = getNpcSchedule(npcId, year, day)
+  const festival = getFestivalOnDay(day)
+  if (!festival?.participantIds.includes(npcId)) return schedule
+
+  const beforeAndAfter = schedule.flatMap((item) => {
+    if (item.endMinute <= festival.startMinute || item.startMinute >= festival.endMinute) return [item]
+    const fragments: ScheduleSegment[] = []
+    if (item.startMinute < festival.startMinute) fragments.push({ ...item, endMinute: festival.startMinute })
+    if (item.endMinute > festival.endMinute) fragments.push({ ...item, startMinute: festival.endMinute })
+    return fragments
+  })
+  return [...beforeAndAfter, {
+    startMinute: festival.startMinute,
+    endMinute: festival.endMinute,
+    locationId: festival.locationId,
+    activity: festival.participantIds[0] === npcId ? `主持${festival.name}` : `参加${festival.name}`,
+  }].sort((left, right) => left.startMinute - right.startMinute)
+}
+
 export function getNpcPresence(npcId: string, year: number, day: number, minutes: number): NpcPresence {
   const safeMinutes = clampInteger(minutes, 0, 1439)
   const festival = getFestivalOnDay(day)
@@ -219,7 +239,7 @@ export function getNpcPresence(npcId: string, year: number, day: number, minutes
       festivalId: festival.id,
     }
   }
-  const schedule = getNpcSchedule(npcId, year, day)
+  const schedule = getNpcScheduleForDay(npcId, year, day)
   const current = schedule.find((item) => safeMinutes >= item.startMinute && safeMinutes < item.endMinute)
     ?? schedule.at(-1)
   if (!current) throw new Error(`角色 ${npcId} 缺少可用行程。`)
