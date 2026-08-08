@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../../game/GameContext'
-import type { Npc } from '../../game/types'
+import { formatClock, formatGameDate, getCalendarDate, getFestivalOnDay, getNpcPresence } from '../../game/calendar'
+import { locations } from '../../game/data'
+import type { GameState, Npc } from '../../game/types'
 import type { ChatSession } from '../../sillytavern/types'
 import { useTavern } from '../../tavern/TavernContext'
 import { GameIcon } from '../icons/GameIcon'
@@ -21,6 +23,30 @@ function extractStreamingMaintext(raw: string): string {
   return (end >= 0 ? content.slice(0, end) : content).trimStart()
 }
 
+function createDialogueVariables(state: GameState, npc: Npc, affinity: number) {
+  const date = getCalendarDate(state.year, state.day)
+  const festival = getFestivalOnDay(state.day)
+  const presence = getNpcPresence(npc.id, state.year, state.day, state.minutes)
+  return {
+    affinity,
+    money: state.money,
+    energy: state.energy,
+    year: state.year,
+    day: state.day,
+    dayOfYear: state.day,
+    date: formatGameDate(state.year, state.day),
+    time: formatClock(state.minutes),
+    weekday: date.weekday,
+    season: date.season,
+    weather: state.weather,
+    location: state.location,
+    playerLocation: locations.find((location) => location.id === state.location)?.name ?? state.location,
+    currentFestival: festival?.name ?? '无节日',
+    npcLocation: locations.find((location) => location.id === presence.locationId)?.name ?? presence.locationId,
+    npcActivity: presence.activity,
+  }
+}
+
 export function TavernDialogue({ npc }: { npc: Npc }) {
   const { state, dispatch } = useGame()
   const tavern = useTavern()
@@ -36,21 +62,18 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
   const settlementRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const dialogueVariables = useMemo(
+    () => createDialogueVariables(state, npc, relationship.affinity),
+    [state, npc, relationship.affinity],
+  )
 
   useEffect(() => {
     if (tavern.status !== 'ready' || openingRef.current) return
     openingRef.current = true
-    const variables = {
-      affinity: relationship.affinity,
-      money: state.money,
-      energy: state.energy,
-      day: state.day,
-      location: state.location,
-    }
-    void tavern.openNpcSession(npc.id, variables)
+    void tavern.openNpcSession(npc.id, dialogueVariables)
       .then((session) => { setSessionId(session.id); setSessionSnapshot(session) })
       .catch((caught) => setError(caught instanceof Error ? caught.message : '会话初始化失败'))
-  }, [tavern.status, tavern.openNpcSession, npc.id, relationship.affinity, state.money, state.energy, state.day, state.location])
+  }, [tavern.status, tavern.openNpcSession, npc.id, dialogueVariables])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 
@@ -78,13 +101,7 @@ export function TavernDialogue({ npc }: { npc: Npc }) {
         sessionId: session.id,
         npcId: npc.id,
         playerText: message,
-        variables: {
-          affinity: relationship.affinity,
-          money: state.money,
-          energy: state.energy,
-          day: state.day,
-          location: state.location,
-        },
+        variables: dialogueVariables,
         affinity: relationship.affinity,
         memoryTags: relationship.memoryTags,
         signal: controller.signal,

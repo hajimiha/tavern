@@ -100,6 +100,10 @@ describe('NPC 酒馆会话', () => {
 
     expect(await screen.findByText('洛岚翻开空白委托簿，说今天先熟悉村庄就好。')).toBeVisible()
     expect(fetchMock).toHaveBeenCalledWith('https://api.deepseek.com/chat/completions', expect.any(Object))
+    const requestBody = String(fetchMock.mock.calls[0]?.[1]?.body)
+    expect(requestBody).toContain('date: 第1年1月1日')
+    expect(requestBody).toContain('npcLocation: 村长家')
+    expect(requestBody).toContain('npcActivity: 休息并准备一天')
     expect((await repository.listSessions())[0].messages.at(-1)).toMatchObject({
       content: '洛岚翻开空白委托簿，说今天先熟悉村庄就好。',
       apiUsed: 'remote',

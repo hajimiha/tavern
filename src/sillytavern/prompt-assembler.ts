@@ -29,7 +29,11 @@ export function assemblePrompt(options: AssembleOptions): AssembleResult {
   const { userInput, history, preset, lorebooks, userName, characterName, variables, extraVariables, formatPrompt } = options;
 
   const allMatchedEntries: MatchedEntry[] = [];
-  const scanText = userInput + ' ' + history.slice(-3).map(m => m.content).join(' ');
+  const variableScanText = [...Object.values(variables ?? {}), ...Object.values(extraVariables ?? {})]
+    .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+    .map(String)
+    .join(' ');
+  const scanText = userInput + ' ' + history.slice(-3).map(m => m.content).join(' ') + ' ' + variableScanText;
 
   for (const book of lorebooks) {
     const engine = createLorebookEngine(book);

@@ -9,6 +9,7 @@ describe('雾灯谷酒馆默认内容', () => {
     const comments = defaults.lorebooks.flatMap((book) => book.entries.map((entry) => entry.comment))
 
     expect(defaults.characters).toHaveLength(15)
+    expect(defaults.lorebooks).toHaveLength(3)
     expect(defaults.characters.map((card) => card.npcId)).toEqual(npcs.map((npc) => npc.id))
     expect(defaults.characters.every((card) => card.id === `mistvale-character-${card.npcId}`)).toBe(true)
     expect(comments).toEqual(expect.arrayContaining(['五行克制', '每日精力', '地点营业']))
@@ -23,6 +24,18 @@ describe('雾灯谷酒馆默认内容', () => {
     expect(defaults.presets[0].settings).not.toHaveProperty('apiKey')
     expect(defaults.presets[0].description).toContain('模型')
     expect(defaults.presets[0].description).not.toContain('本地剧情引擎')
+  })
+
+  it('提供完整岁时世界书并挂载到每张角色卡', () => {
+    const defaults = createMistvaleDefaults()
+    const calendarBook = defaults.lorebooks.find((book) => book.id === 'mistvale-calendar-festivals')
+
+    expect(calendarBook?.entries.filter((entry) => entry.id.startsWith('mistvale-festival-'))).toHaveLength(12)
+    expect(calendarBook?.entries.find((entry) => entry.comment === '迎岁灯会')?.content).toContain('点灯祈愿')
+    expect(calendarBook?.entries.find((entry) => entry.comment === '迎岁灯会')?.content).toContain('壁炉共餐')
+    expect(defaults.characters.every((card) => card.lorebookIds.includes('mistvale-calendar-festivals'))).toBe(true)
+    expect(defaults.settings.activeLorebookIds).toContain('mistvale-calendar-festivals')
+    expect(defaults.lorebooks.find((book) => book.id === 'mistvale-village-archive')?.entries.find((entry) => entry.comment === '柳安档案')?.content).toContain('4月12日')
   })
 
   it('为角色卡绑定所在地、首句和世界书', () => {

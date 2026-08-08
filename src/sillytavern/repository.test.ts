@@ -28,7 +28,7 @@ describe('雾灯谷酒馆仓储', () => {
 
     await repository.initialize()
     expect((await repository.getCharacter(edited.id))?.personality).toBe('玩家自定义性格')
-    expect(await repository.listLorebooks()).toHaveLength(2)
+    expect(await repository.listLorebooks()).toHaveLength(3)
     const settings = await repository.getSettings()
     expect(settings).not.toHaveProperty('adapterMode')
     expect(settings.api.model).toBe('deepseek-v4-flash')
@@ -100,5 +100,34 @@ describe('雾灯谷酒馆仓储', () => {
     await repositoryV2.initialize()
     expect((await repositoryV2.getCharacter(card.id))?.personality).toBe('仓库版本二')
     expect((await repositoryV2.getCharacter('local-custom-character'))?.personality).toBe('本机新增')
+  })
+
+  it('只迁移一次旧设备的岁时世界书绑定并保留原有自定义内容', async () => {
+    database = createTavernDatabase(`mistvale-calendar-migration-${crypto.randomUUID()}`)
+    const repository = createTavernRepository(database)
+    await repository.initialize()
+    const calendarId = 'mistvale-calendar-festivals'
+    const settings = await repository.getSettings()
+    const loran = (await repository.listCharacters()).find((card) => card.npcId === 'loran')!
+    const customPersonality = '玩家保留的自定义性格'
+    await database.lorebooks.delete(calendarId)
+    await database.settings.put({
+      ...settings,
+      activeLorebookIds: settings.activeLorebookIds.filter((id) => id !== calendarId),
+      defaultContentVersion: 1,
+    } as never)
+    await database.characters.put({ ...loran, personality: customPersonality, lorebookIds: loran.lorebookIds.filter((id) => id !== calendarId) })
+    await database.sessions.put({
+      id: 'legacy-session', name: '旧会话', npcId: 'loran', characterId: loran.id, characterName: '洛岚', userName: '旅行者', presetId: null,
+      lorebookIds: loran.lorebookIds.filter((id) => id !== calendarId), variables: {}, messages: [], createdAt: 1, updatedAt: 1,
+    })
+
+    await repository.initialize()
+
+    expect(await repository.getLorebook(calendarId)).toBeDefined()
+    expect((await repository.getCharacter(loran.id))?.lorebookIds).toContain(calendarId)
+    expect((await repository.getCharacter(loran.id))?.personality).toBe(customPersonality)
+    expect((await repository.getSettings()).activeLorebookIds).toContain(calendarId)
+    expect((await repository.getSession('legacy-session'))?.lorebookIds).toContain(calendarId)
   })
 })

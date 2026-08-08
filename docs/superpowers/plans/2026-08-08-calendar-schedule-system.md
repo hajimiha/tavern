@@ -271,6 +271,9 @@ git push origin main
 - Modify: `src/sillytavern/defaults.test.ts`
 - Modify: `src/sillytavern/prompt-assembler.ts`
 - Modify: `src/sillytavern/prompt-assembler.test.ts`
+- Modify: `src/sillytavern/repository.ts`
+- Modify: `src/sillytavern/repository.test.ts`
+- Modify: `src/sillytavern/types.ts`
 - Modify: `src/components/SillyTavern/TavernDialogue.tsx`
 - Modify: `src/components/SillyTavern/TavernDialogue.test.tsx`
 
@@ -278,7 +281,7 @@ git push origin main
 - Consumes: festivals, birthdays, schedule summaries and live presence functions。
 - Produces: third default lorebook `mistvale-calendar-festivals` and expanded dialogue variables。
 
-- [ ] **Step 1: 写默认岁时世界书失败测试**
+- [x] **Step 1: 写默认岁时世界书失败测试**
 
 ```ts
 const defaults = createMistvaleDefaults()
@@ -288,24 +291,24 @@ expect(calendarBook?.entries.find((entry) => entry.comment === '迎岁灯会')?.
 expect(defaults.characters.find((card) => card.npcId === 'liuan')?.lorebookIds).toContain('mistvale-calendar-festivals')
 ```
 
-- [ ] **Step 2: 运行 defaults 测试确认红灯**
+- [x] **Step 2: 运行 defaults 测试确认红灯**
 
-- [ ] **Step 3: 生成岁时世界书并把生日、行程摘要写入人物档案**
+- [x] **Step 3: 生成岁时世界书并把生日、行程摘要写入人物档案**
 
-- [ ] **Step 4: 写变量值触发节日世界书的失败测试**
+- [x] **Step 4: 写变量值触发节日世界书的失败测试**
 
 ```ts
 const result = assemblePrompt({ ...baseOptions, userInput: '今天有什么安排？', extraVariables: { currentFestival: '迎岁灯会' } })
 expect(result.matchedEntries.some((match) => match.entry.comment === '迎岁灯会')).toBe(true)
 ```
 
-- [ ] **Step 5: 把 `variables` 与 `extraVariables` 的字符串值加入 `scanText`，保持唯一条目与既有排序逻辑**
+- [x] **Step 5: 把 `variables` 与 `extraVariables` 的字符串值加入 `scanText`，保持唯一条目与既有排序逻辑**
 
-- [ ] **Step 6: 扩展 TavernDialogue 变量**
+- [x] **Step 6: 扩展 TavernDialogue 变量**
 
 每次打开与发送都注入 `year`、`dayOfYear`、`date`、`time`、`weekday`、`season`、`weather`、`currentFestival`、`npcLocation`、`npcActivity`，同时保留现有金币、精力、好感和位置变量。
 
-- [ ] **Step 7: 运行 defaults、prompt assembler 与 dialogue 测试并确认通过**
+- [x] **Step 7: 运行 defaults、prompt assembler 与 dialogue 测试并确认通过**
 
 - [ ] **Step 8: 提交并推送**
 

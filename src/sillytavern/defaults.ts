@@ -1,4 +1,5 @@
 import { locations, npcs } from '../game/data'
+import { festivals, formatClock, npcSchedules, WEEKDAYS } from '../game/calendar'
 import type { Npc } from '../game/types'
 import {
   createDefaultPreset,
@@ -13,6 +14,8 @@ import {
 
 const WORLD_RULES_ID = 'mistvale-world-rules'
 const VILLAGE_ARCHIVE_ID = 'mistvale-village-archive'
+export const CALENDAR_FESTIVALS_ID = 'mistvale-calendar-festivals'
+export const DEFAULT_CONTENT_VERSION = 2
 
 function entry(
   id: string,
@@ -131,7 +134,7 @@ function createCharacterCard(npc: Npc, now: number): CharacterCard {
     scenario: `当前位于${location?.name ?? '雾灯谷'}。玩家可与${npc.name}聊天、送礼，并按其身份进行交易或委托互动。`,
     firstMessage: voice.firstMessage,
     exampleDialogue: voice.example,
-    lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID],
+    lorebookIds: [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID],
     portraitByAffinity: { ...npc.portraitByAffinity },
     tags: [npc.role, location?.name ?? '雾灯谷', '女性角色'],
     createdAt: now,
@@ -179,7 +182,37 @@ function createVillageArchive(now: number): Lorebook {
           `mistvale-person-${npc.id}`,
           `${npc.name}档案`,
           [npc.name, npc.role, location?.name ?? npc.locationId],
-          `${npc.name}是${npc.role}，常在${location?.name ?? '雾灯谷'}活动。${npc.description}性格与话语基调：${voice.personality}`,
+          `${npc.name}是${npc.role}，生日为${npc.birthday.month}月${npc.birthday.day}日，常驻地是${location?.name ?? '雾灯谷'}。${npc.description}性格与话语基调：${voice.personality}常规行程：${npcSchedules[npc.id].defaultSegments.map((segment) => `${formatClock(segment.startMinute)}至${segment.endMinute === 1440 ? '24:00' : formatClock(segment.endMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('；')}。每周变更：${Object.entries(npcSchedules[npc.id].weeklyOverrides ?? {}).map(([weekday, segments]) => `${WEEKDAYS[Number(weekday)]}${segments?.map((segment) => `${formatClock(segment.startMinute)}在${locations.find((item) => item.id === segment.locationId)?.name ?? segment.locationId}${segment.activity}`).join('、')}`).join('；') || '无'}。`,
+          { order: 100 + index * 5, position: 'after_char' },
+        )
+      }),
+    ],
+  }
+}
+
+function createCalendarFestivals(now: number): Lorebook {
+  const birthdayIndex = npcs.map((npc) => `${npc.birthday.month}月${npc.birthday.day}日是${npc.name}的生日`).join('；')
+  return {
+    id: CALENDAR_FESTIVALS_ID,
+    name: '雾灯谷·岁时与庆典',
+    description: '365日历、居民生日、动态日程与十二个月度节日活动。',
+    recursiveScanning: false,
+    caseSensitive: false,
+    matchWholeWords: false,
+    createdAt: now,
+    updatedAt: now,
+    entries: [
+      entry('mistvale-calendar-rules', '岁时规则', ['日期', '日历', '行程', '节日', '生日'], '雾灯谷一年固定365天，分为十二个月。人物会按照当前日期与时刻在工作地点、休闲地点和住处之间移动；叙事必须服从游戏变量给出的当前时间、地点和活动，不得让同一人物同时出现在两个地点。', { constant: true, order: 5, position: 'before_char' }),
+      entry('mistvale-birthday-index', '居民生日表', ['生日', ...npcs.map((npc) => npc.name)], `${birthdayIndex}。角色生日当天，赠送其偏爱礼物获得双倍好感；人物应对生日祝福与礼物作出符合当前关系阶段的回应。`, { constant: true, order: 8, position: 'before_char' }),
+      ...festivals.map((festival, index) => {
+        const location = locations.find((item) => item.id === festival.locationId)
+        const activityText = festival.activities.map((activity) => `${formatClock(activity.startMinute)}至${activity.endMinute === 1440 ? '24:00' : formatClock(activity.endMinute)}举行“${activity.name}”：${activity.description}`).join('；')
+        const participants = festival.participantIds.map((id) => npcs.find((npc) => npc.id === id)?.name).filter(Boolean).join('、')
+        return entry(
+          `mistvale-festival-${festival.id}`,
+          festival.name,
+          [festival.name, `${festival.month}月${festival.date}日`, ...festival.activities.map((activity) => activity.name)],
+          `${festival.month}月${festival.date}日是${festival.name}，会场位于${location?.name ?? festival.locationId}，开放时间${formatClock(festival.startMinute)}至${festival.endMinute === 1440 ? '24:00' : formatClock(festival.endMinute)}。${festival.description}参与人物：${participants}。当日活动依次为：${activityText}。只有游戏日期与时间吻合时才应把角色视为正在参加对应活动。`,
           { order: 100 + index * 5, position: 'after_char' },
         )
       }),
@@ -191,7 +224,7 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
   const now = Date.now()
   const presetSeed = createDefaultPreset()
   const presetId = 'mistvale-preset-narrative'
-  const lorebooks = [createWorldRules(now), createVillageArchive(now)]
+  const lorebooks = [createWorldRules(now), createVillageArchive(now), createCalendarFestivals(now)]
   const settings: TavernSettings = {
     key: 'mistvale-settings',
     api: {
@@ -216,6 +249,7 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
     customTags: [...DEFAULT_TAGS],
     formatPromptTemplate: DEFAULT_FORMAT_PROMPT,
     thinkingDisplay: 'fold',
+    defaultContentVersion: DEFAULT_CONTENT_VERSION,
     updatedAt: now,
   }
 
@@ -228,4 +262,4 @@ export function createMistvaleDefaults(): MistvaleTavernDefaults {
   }
 }
 
-export const MISTVALE_LOREBOOK_IDS = [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID] as const
+export const MISTVALE_LOREBOOK_IDS = [WORLD_RULES_ID, VILLAGE_ARCHIVE_ID, CALENDAR_FESTIVALS_ID] as const

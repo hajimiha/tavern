@@ -1,4 +1,4 @@
-import { createMistvaleDefaults } from './defaults'
+import { CALENDAR_FESTIVALS_ID, createMistvaleDefaults, DEFAULT_CONTENT_VERSION } from './defaults'
 import { normalizeTavernSettings } from './api-config'
 import type { MistvaleTavernDatabase } from './database'
 import { tavernDatabase } from './database'
@@ -51,10 +51,16 @@ class DexieTavernRepository implements TavernRepository {
       async () => {
         const storedSettings = await this.database.settings.get('mistvale-settings')
         const shouldPublishPack = Boolean(contentPack && storedSettings?.contentPackVersion !== contentPack.contentVersion)
+        const shouldMigrateDefaults = (storedSettings?.defaultContentVersion ?? 1) < DEFAULT_CONTENT_VERSION
         if ((await this.database.lorebooks.count()) === 0) {
           await this.database.lorebooks.bulkAdd(mergeById(defaults.lorebooks, contentPack?.lorebooks ?? []))
-        } else if (shouldPublishPack && contentPack?.lorebooks.length) {
-          await this.database.lorebooks.bulkPut(contentPack.lorebooks)
+        } else {
+          if (shouldMigrateDefaults) {
+            const existingIds = new Set((await this.database.lorebooks.toArray()).map((book) => book.id))
+            const missingDefaults = defaults.lorebooks.filter((book) => !existingIds.has(book.id))
+            if (missingDefaults.length) await this.database.lorebooks.bulkAdd(missingDefaults)
+          }
+          if (shouldPublishPack && contentPack?.lorebooks.length) await this.database.lorebooks.bulkPut(contentPack.lorebooks)
         }
         if ((await this.database.presets.count()) === 0) {
           await this.database.presets.bulkAdd(mergeById(defaults.presets, contentPack?.presets ?? []))
@@ -63,16 +69,35 @@ class DexieTavernRepository implements TavernRepository {
         }
         if ((await this.database.characters.count()) === 0) {
           await this.database.characters.bulkAdd(mergeById(defaults.characters, contentPack?.characters ?? []))
-        } else if (shouldPublishPack && contentPack?.characters.length) {
-          await this.database.characters.bulkPut(contentPack.characters)
+        } else {
+          if (shouldPublishPack && contentPack?.characters.length) await this.database.characters.bulkPut(contentPack.characters)
+          if (shouldMigrateDefaults) {
+            const defaultCharacterIds = new Set(defaults.characters.map((card) => card.id))
+            const migratedCharacters = (await this.database.characters.toArray())
+              .filter((card) => defaultCharacterIds.has(card.id) && !card.lorebookIds.includes(CALENDAR_FESTIVALS_ID))
+              .map((card) => ({ ...card, lorebookIds: [...card.lorebookIds, CALENDAR_FESTIVALS_ID] }))
+            if (migratedCharacters.length) await this.database.characters.bulkPut(migratedCharacters)
+          }
         }
         if ((await this.database.sessions.count()) === 0 && defaults.sessions.length > 0) {
           await this.database.sessions.bulkAdd(defaults.sessions)
+        } else if (shouldMigrateDefaults) {
+          const defaultNpcIds = new Set(defaults.characters.map((card) => card.npcId))
+          const migratedSessions = (await this.database.sessions.toArray())
+            .filter((session) => session.npcId && defaultNpcIds.has(session.npcId) && !session.lorebookIds.includes(CALENDAR_FESTIVALS_ID))
+            .map((session) => ({ ...session, lorebookIds: [...session.lorebookIds, CALENDAR_FESTIVALS_ID] }))
+          if (migratedSessions.length) await this.database.sessions.bulkPut(migratedSessions)
         }
         if ((await this.database.settings.count()) === 0) {
-          await this.database.settings.add({ ...defaults.settings, contentPackVersion: contentPack?.contentVersion })
-        } else if (shouldPublishPack && contentPack) {
-          await this.database.settings.update('mistvale-settings', { contentPackVersion: contentPack.contentVersion })
+          await this.database.settings.add({ ...defaults.settings, contentPackVersion: contentPack?.contentVersion, defaultContentVersion: DEFAULT_CONTENT_VERSION })
+        } else if (shouldPublishPack || shouldMigrateDefaults) {
+          await this.database.settings.update('mistvale-settings', {
+            ...(shouldPublishPack && contentPack ? { contentPackVersion: contentPack.contentVersion } : {}),
+            ...(shouldMigrateDefaults ? {
+              defaultContentVersion: DEFAULT_CONTENT_VERSION,
+              activeLorebookIds: Array.from(new Set([...(storedSettings?.activeLorebookIds ?? []), CALENDAR_FESTIVALS_ID])),
+            } : {}),
+          })
         }
       },
     )

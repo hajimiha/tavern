@@ -91,4 +91,27 @@ describe('assemblePrompt formatPrompt injection', () => {
       'user:本轮输入',
     ]);
   });
+
+  it('uses live game variable values to trigger the matching festival lorebook entry', () => {
+    const out = assemblePrompt({
+      userInput: '今天有什么安排？',
+      history: [],
+      preset: {
+        id: 'p', name: 'p', createdAt: 0, updatedAt: 0,
+        settings: { prompt_order: [{ identifier: 'worldInfoAfter', enabled: true }] },
+      },
+      lorebooks: [{
+        id: 'calendar', name: '岁时', recursiveScanning: false, caseSensitive: false, matchWholeWords: false, createdAt: 0, updatedAt: 0,
+        entries: [{
+          id: 'new-year', keys: ['迎岁灯会'], secondaryKeys: [], content: '傍晚前往壁炉议事厅点灯。', comment: '迎岁灯会', order: 10, position: 'after_char', selective: false, selectiveLogic: 'and_any', constant: false, probability: 100, addMemo: true,
+        }],
+      }],
+      userName: '玩家',
+      characterName: '洛岚',
+      extraVariables: { currentFestival: '迎岁灯会' },
+    });
+
+    expect(out.matchedEntries.map((match) => match.entry.comment)).toContain('迎岁灯会');
+    expect(out.systemPrompt).toContain('傍晚前往壁炉议事厅点灯');
+  });
 });

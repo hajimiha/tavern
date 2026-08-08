@@ -292,6 +292,7 @@ export interface TavernSettings {
   formatPromptTemplate: string
   thinkingDisplay: 'fold' | 'hide' | 'inline'
   contentPackVersion?: string
+  defaultContentVersion?: number
   updatedAt: number
 }
 
