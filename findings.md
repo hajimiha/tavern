@@ -168,3 +168,11 @@
 - 角色卡编辑器已经能把各好感阶段立绘读成 Data URL 并保存至 Dexie；欠缺的是尺寸/类型校验、导出入口以及“本机草稿/仓库默认”说明。无需重新实现上传控件。
 - 世界书和预设编辑器已有完整 CRUD，但世界书面板未接入现有 `importer.ts`，预设也没有导入导出；可增加隐藏文件输入与 JSON 下载工具，并由内容包聚合器统一生成可提交到仓库的 `mistvale-content-pack.json`。
 - TavernContext 对仓储操作已有稳定 CRUD 边界，内容包导入应通过批量 repository 方法（事务写入）后执行一次 `reloadContent()`，避免组件循环逐条保存导致中间态和多次重渲染。
+# Phase 10：SillyTavern 预设兼容调查
+
+- 用户提供的 `夏瑾 天琴座 Beta 1.0.json` 是有效 UTF-8 JSON，约 128 KB，包含 140 个 `prompts`。
+- 其 `prompt_order` 与 SillyTavern 官方 OpenAI 预设一致：外层是两个角色槽位组，`100000` 有 11 项，`100001` 有 55 项且启用 28 项。
+- 当前导入器只接受 `{ identifier, enabled }[]` 扁平数组，因此在持久化前错误拒绝官方的 `{ character_id, order }[]`。
+- 参考项目 `MoRanJiangHu` 同样先规范化分组，再优先选择 `character_id = 100001`，这也是当前兼容层应采用的默认行为。
+- 真实文件中另有 5 个提示词使用 Gemini 风格的 `role: "model"`；该值需要在运行时规范化为 `assistant`，但不能因此拒绝整个预设。
+- 预设必须保留全部原始字段（包括 extensions 与生成参数）；界面和模型装配通过读取辅助函数解释结构，避免导入后再导出造成数据丢失。

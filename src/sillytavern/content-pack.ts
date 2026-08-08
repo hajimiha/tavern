@@ -1,4 +1,5 @@
 import type { CharacterCard, ChatPreset, Lorebook, LorebookEntry } from './types'
+import { validatePresetSettings } from './preset-compat'
 
 export const TAVERN_CONTENT_PACK_PATH = 'content/mistvale-content-pack.json'
 export const MAX_PORTRAIT_FILE_BYTES = 512 * 1024
@@ -38,7 +39,6 @@ const isSafePortraitSource = (value: string) => !value
 
 const positions = new Set<LorebookEntry['position']>(['before_char', 'after_char', 'before_example', 'after_example', 'at_depth', 'example_msg_top', 'example_msg_bottom', 'outlet'])
 const selectiveLogics = new Set<LorebookEntry['selectiveLogic']>(['and_any', 'not_all', 'not_any', 'and_all'])
-const roles = new Set(['system', 'user', 'assistant'])
 
 function isLorebookEntry(value: unknown): value is LorebookEntry {
   if (!isRecord(value)) return false
@@ -75,19 +75,9 @@ function isLorebook(value: unknown): value is Lorebook {
     && isFiniteNumber(value.updatedAt)
 }
 
-function isPromptArray(value: unknown): boolean {
-  return Array.isArray(value) && value.every((item) => isRecord(item)
-    && isString(item.identifier)
-    && isOptionalString(item.name)
-    && isOptionalString(item.content)
-    && (item.role === undefined || roles.has(String(item.role)))
-    && isOptionalBoolean(item.enabled))
-}
-
 function isPreset(value: unknown): value is ChatPreset {
   if (!isRecord(value) || !isRecord(value.settings)) return false
-  if (value.settings.prompt_order !== undefined && !isPromptArray(value.settings.prompt_order)) return false
-  if (value.settings.prompts !== undefined && !isPromptArray(value.settings.prompts)) return false
+  try { validatePresetSettings(value.settings) } catch { return false }
   return isString(value.id)
     && isString(value.name)
     && isOptionalString(value.description)

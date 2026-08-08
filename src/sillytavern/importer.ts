@@ -3,6 +3,7 @@
  */
 
 import type { Lorebook, LorebookEntry, ChatPreset, SillyTavernLorebookExport } from './types';
+import { validatePresetSettings } from './preset-compat';
 
 const POSITION_MAP: Record<number, LorebookEntry['position']> = {
   0: 'before_char',
@@ -67,31 +68,6 @@ function validateLorebookImport(value: unknown): SillyTavernLorebookExport {
   }
   if (value.settings !== undefined && !isRecord(value.settings)) throw new Error('世界书 settings 必须是对象。');
   return value as unknown as SillyTavernLorebookExport;
-}
-
-function validatePresetImport(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) throw new Error('预设必须是 JSON 对象。');
-  if (value.name !== undefined && typeof value.name !== 'string') throw new Error('预设名称必须是字符串。');
-  if (value.preset !== undefined && typeof value.preset !== 'string') throw new Error('预设名称必须是字符串。');
-  if (value.description !== undefined && typeof value.description !== 'string') throw new Error('预设说明必须是字符串。');
-  if (value.prompt_order !== undefined) {
-    if (!Array.isArray(value.prompt_order) || !value.prompt_order.every((item) => isRecord(item)
-      && typeof item.identifier === 'string'
-      && (item.name === undefined || typeof item.name === 'string')
-      && (item.role === undefined || ['system', 'user', 'assistant'].includes(String(item.role)))
-      && (item.enabled === undefined || typeof item.enabled === 'boolean'))) {
-      throw new Error('预设 prompt_order 结构无效。');
-    }
-  }
-  if (value.prompts !== undefined) {
-    if (!Array.isArray(value.prompts) || !value.prompts.every((item) => isRecord(item)
-      && typeof item.identifier === 'string'
-      && (item.role === undefined || ['system', 'user', 'assistant'].includes(String(item.role)))
-      && (item.content === undefined || typeof item.content === 'string'))) {
-      throw new Error('预设 prompts 结构无效。');
-    }
-  }
-  return value;
 }
 
 export function importLorebook(value: unknown): Omit<Lorebook, 'id' | 'createdAt' | 'updatedAt'> {
@@ -202,9 +178,9 @@ export function exportLorebook(lorebook: Lorebook): SillyTavernLorebookExport {
   };
 }
 
-export function importPreset(value: unknown): Omit<ChatPreset, 'id' | 'createdAt' | 'updatedAt'> {
-  const data = validatePresetImport(value);
-  const name = data.preset || data.name || '导入的预设';
+export function importPreset(value: unknown, fallbackName = '导入的预设'): Omit<ChatPreset, 'id' | 'createdAt' | 'updatedAt'> {
+  const data = validatePresetSettings(value);
+  const name = data.preset || data.name || fallbackName;
   return {
     name: String(name),
     description: typeof data.description === 'string' ? data.description : undefined,

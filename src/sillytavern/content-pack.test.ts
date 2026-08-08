@@ -35,4 +35,17 @@ describe('仓库酒馆内容包', () => {
     expect(() => parseContentPack({ ...base, lorebooks: [], presets: [{ id: 'bad', name: {}, settings: {} }], characters: [] })).toThrow(/预设/)
     expect(() => parseContentPack({ ...base, lorebooks: [], presets: [], characters: [{ id: 'bad', portraitByAffinity: {} }] })).toThrow(/角色卡/)
   })
+
+  it('允许发布带角色槽位分组的 SillyTavern 官方预设', () => {
+    const defaults = createMistvaleDefaults()
+    const groupedPreset = {
+      ...defaults.presets[0],
+      settings: {
+        prompts: [{ identifier: 'main', name: '主提示词', role: 'system', content: '正文' }],
+        prompt_order: [{ character_id: 100001, order: [{ identifier: 'main', enabled: true }] }],
+      },
+    }
+    const pack = createContentPack({ contentVersion: 'grouped-preset', lorebooks: [], presets: [groupedPreset], characters: [] })
+    expect(pack.presets[0].settings.prompt_order).toEqual(groupedPreset.settings.prompt_order)
+  })
 })

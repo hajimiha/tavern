@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { exportLorebook, importLorebook, importMultipleLorebooks, importPreset, renameLorebook } from './importer';
+import { exportLorebook, exportPreset, importLorebook, importMultipleLorebooks, importPreset, renameLorebook } from './importer';
+import { getPresetPromptDefinitions, getPresetPromptOrder, updatePresetPromptOrder } from './preset-compat';
 import type { SillyTavernLorebookExport } from './types';
 
 const stub = (name: string): SillyTavernLorebookExport => ({
@@ -47,5 +48,53 @@ describe('importer multi/rename', () => {
 
     expect(imported.entries[0]).toMatchObject({ disabled: true, excluded: false });
     expect(exported.entries['0']).toMatchObject({ disable: true, excluded: false, content: 'hidden lore' });
+  });
+
+  it('imports official grouped SillyTavern prompt order and prefers character slot 100001', () => {
+    const source = {
+      temperature: 1,
+      prompts: [
+        { identifier: 'main', name: '主提示词', role: 'system', content: '推进 {{char}} 的故事。', system_prompt: true },
+        { identifier: 'chatHistory', name: '聊天历史', marker: true, system_prompt: true },
+        { identifier: 'geminiReply', name: 'Gemini 角色回复', role: 'model', content: '角色侧提示词' },
+      ],
+      prompt_order: [
+        { character_id: 100000.5, order: [{ identifier: 'main', role: 'model', enabled: false }] },
+        { character_id: 100001, order: [
+          { identifier: 'main', enabled: true },
+          { identifier: 'chatHistory', enabled: true },
+        ] },
+      ],
+      extensions: { regex_scripts: [] },
+    };
+
+    const imported = importPreset(source, '夏瑾 天琴座 Beta 1.0');
+    const activeOrder = getPresetPromptOrder(imported.settings);
+    expect(imported.name).toBe('夏瑾 天琴座 Beta 1.0');
+    expect(activeOrder.characterId).toBe(100001);
+    expect(activeOrder.items).toHaveLength(2);
+    expect(getPresetPromptDefinitions(imported.settings).find((prompt) => prompt.identifier === 'geminiReply')?.role).toBe('assistant');
+    expect(imported.settings.extensions).toEqual({ regex_scripts: [] });
+
+    const changedSettings = updatePresetPromptOrder(imported.settings, 100001, [
+      { identifier: 'main', enabled: false },
+      { identifier: 'chatHistory', enabled: true },
+    ]);
+    const exported = exportPreset({ ...imported, settings: changedSettings, id: 'preset', createdAt: 1, updatedAt: 1 });
+    expect(exported.prompt_order).toEqual([
+      { character_id: 100000.5, order: [{ identifier: 'main', role: 'model', enabled: false }] },
+      { character_id: 100001, order: [
+        { identifier: 'main', enabled: false },
+        { identifier: 'chatHistory', enabled: true },
+      ] },
+    ]);
+    expect(exported.extensions).toEqual({ regex_scripts: [] });
+  });
+
+  it('rejects malformed members inside grouped SillyTavern prompt order', () => {
+    expect(() => importPreset({
+      prompts: [{ identifier: 'main', content: 'ok' }],
+      prompt_order: [{ character_id: 100001, order: [{ identifier: {}, enabled: true }] }],
+    })).toThrow('prompt_order');
   });
 });

@@ -303,19 +303,41 @@
 .preset-workspace { grid-template-columns: 215px minmax(0, 1fr); }
 .preset-copy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 13px; }
 .prompt-order-section { margin: 0 13px 13px; border: 1px solid var(--border-muted); border-radius: 9px; overflow: hidden; }
-.prompt-order-section > header { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--border-muted); background: rgba(20, 45, 36, .44); }
+.prompt-order-section > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--border-muted); background: rgba(20, 45, 36, .44); }
 .prompt-order-section > header span { color: var(--copper-300); font-family: var(--font-numeric); font-size: 7px; }
 .prompt-order-section > header h4 { margin: 2px 0 0; font-size: 12px; }
 .prompt-order-section > header small { max-width: 330px; color: var(--text-muted); font-size: 7px; text-align: right; }
+.prompt-order-slot-tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.prompt-order-slot-tools label { display: flex; align-items: center; gap: 7px; }
+.prompt-order-slot-tools label > span { margin: 0; white-space: nowrap; }
+.prompt-order-slot-tools select { min-height: 34px; padding: 4px 24px 4px 8px; font-family: var(--font-numeric); font-size: 8px; }
+.prompt-order-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 10px; padding: 8px 13px; border-bottom: 1px solid rgba(205, 187, 145, .09); background: linear-gradient(90deg, rgba(213, 166, 74, .06), transparent 52%); }
+.prompt-order-toolbar > div { display: flex; align-items: baseline; gap: 8px; }
+.prompt-order-toolbar strong { color: var(--text-primary); font-size: 9px; }
+.prompt-order-toolbar span { color: var(--text-muted); font-family: var(--font-numeric); font-size: 7px; }
+.prompt-order-toolbar label { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.prompt-order-toolbar label > span { margin: 0; color: var(--text-secondary); font-family: var(--font-body); font-size: 8px; }
 .prompt-order-list { margin: 0; padding: 0; list-style: none; }
-.prompt-order-list li { display: grid; min-height: 49px; grid-template-columns: 30px minmax(190px, 1fr) 86px 34px 34px; align-items: center; gap: 5px; padding: 6px 9px; border-bottom: 1px solid rgba(205, 187, 145, .08); }
+.prompt-order-list li { min-width: 0; border-bottom: 1px solid rgba(205, 187, 145, .08); transition: background-color 150ms ease, box-shadow 150ms ease; }
 .prompt-order-list li:last-child { border-bottom: 0; }
+.prompt-order-list li.is-expanded { background: rgba(154, 122, 199, .055); box-shadow: inset 2px 0 rgba(154, 122, 199, .5); }
+.prompt-order-row { display: grid; min-height: 58px; grid-template-columns: 30px minmax(190px, 1fr) 86px 34px 34px 34px; align-items: center; gap: 5px; padding: 6px 9px; }
 .prompt-order-index { color: var(--copper-300); font-family: var(--font-numeric); font-size: 7px; }
-.prompt-order-list label { display: grid; min-width: 0; grid-template-columns: 18px 145px 1fr; align-items: center; gap: 6px; }
-.prompt-order-list label code { overflow: hidden; font-size: 7px; text-overflow: ellipsis; }
-.prompt-order-list label > span { overflow: hidden; margin: 0; color: var(--text-secondary); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-order-identity { display: grid; min-width: 0; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 7px; }
+.prompt-order-identity > span { display: grid !important; min-width: 0; gap: 2px; margin: 0 !important; }
+.prompt-order-identity strong { overflow: hidden; color: var(--text-secondary); font-size: 8px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-order-identity code { overflow: hidden; color: var(--text-muted); font-size: 6px; text-overflow: ellipsis; white-space: nowrap; }
 .prompt-order-list select { min-height: 34px; padding: 4px; font-size: 8px; }
 .prompt-order-list button { display: grid; width: 32px; height: 34px; padding: 0; place-items: center; color: var(--text-secondary); border: 1px solid var(--border-muted); border-radius: 6px; background: rgba(242, 229, 198, .03); }
+.prompt-order-list .prompt-expand-button { color: var(--copper-300); border-color: var(--border-copper); background: rgba(213, 166, 74, .055); }
+.prompt-order-detail { display: grid; gap: 9px; margin: 0 9px 9px 39px; padding: 11px; border: 1px solid rgba(154, 122, 199, .2); border-radius: 8px; background: rgba(3, 12, 10, .54); animation: prompt-detail-enter 150ms var(--ease-out) both; }
+.prompt-order-detail > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.prompt-order-detail > div span { color: #c7b2e5; font-size: 8px; }
+.prompt-order-detail > div code { overflow: hidden; color: var(--text-muted); font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-order-detail > p { margin: 0; color: var(--text-muted); font-size: 8px; line-height: 1.6; }
+.prompt-order-detail label > span { color: var(--text-secondary); }
+.prompt-order-detail textarea { min-height: 132px; font-family: var(--font-body); font-size: 8px; }
+@keyframes prompt-detail-enter { from { opacity: 0; transform: translateY(-4px); } }
 
 .character-stat { display: grid; grid-template-columns: auto 1fr; align-items: end; gap: 6px; }
 .character-stat strong { color: var(--copper-300); font-family: var(--font-numeric); font-size: 25px; }
@@ -481,10 +503,12 @@
   .tavern-form-grid.two-column, .tavern-form-grid.three-column, .preset-copy-grid { grid-template-columns: 1fr; }
   .prompt-order-section > header { display: block; }
   .prompt-order-section > header small { display: block; margin-top: 5px; text-align: left; }
-  .prompt-order-list li { grid-template-columns: 25px minmax(130px, 1fr) 34px 34px; }
+  .prompt-order-slot-tools { align-items: stretch; flex-direction: column; margin-top: 8px; }
+  .prompt-order-slot-tools label { justify-content: space-between; }
+  .prompt-order-toolbar { align-items: flex-start; flex-direction: column; }
+  .prompt-order-row { grid-template-columns: 25px minmax(130px, 1fr) 34px 34px 34px; }
   .prompt-order-list select { display: none; }
-  .prompt-order-list label { grid-template-columns: 18px 1fr; }
-  .prompt-order-list label > span { display: none; }
+  .prompt-order-detail { margin-left: 9px; }
   .character-card-grid { grid-template-columns: 1fr; }
   .character-editor { position: fixed; inset: 6px; width: auto; z-index: 170; }
   .portrait-stage-tabs { grid-template-columns: repeat(3, 1fr); }

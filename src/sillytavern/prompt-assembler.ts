@@ -5,6 +5,7 @@
 import type { ChatPreset, Lorebook, ChatMessage, MatchedEntry } from './types';
 import { createLorebookEngine } from './lorebook-engine';
 import { formatVariablesForPrompt } from './variables';
+import { getPresetPromptDefinitions, getPresetPromptOrder, normalizePresetPromptRole } from './preset-compat';
 
 export interface AssembleOptions {
   userInput: string;
@@ -57,18 +58,8 @@ export function assemblePrompt(options: AssembleOptions): AssembleResult {
     currentTokens += msgTokens;
   }
 
-  const promptOrder = (preset.settings.prompt_order || []) as Array<{
-    identifier: string;
-    name?: string;
-    role?: 'system' | 'user' | 'assistant';
-    enabled?: boolean;
-  }>;
-
-  const prompts = (preset.settings.prompts || []) as Array<{
-    identifier: string;
-    role?: 'system' | 'user' | 'assistant';
-    content?: string;
-  }>;
+  const promptOrder = getPresetPromptOrder(preset.settings).items;
+  const prompts = getPresetPromptDefinitions(preset.settings);
 
   function resolvePromptContent(identifier: string): string | null {
     const stringSetting = (key: string): string | null => {
@@ -139,7 +130,7 @@ export function assemblePrompt(options: AssembleOptions): AssembleResult {
     let content = replaceMacros(rawContent, { userName, characterName, userInput, variables });
     if (!content.trim()) continue;
 
-    const role = item.role || 'system';
+    const role = normalizePresetPromptRole(item.role) || prompts.find((prompt) => prompt.identifier === item.identifier)?.role || 'system';
     if (role === 'system') {
       systemAccumulator += (systemAccumulator ? '\n\n' : '') + content;
     } else {
@@ -168,7 +159,7 @@ export function assemblePrompt(options: AssembleOptions): AssembleResult {
   }
 
   if (systemAccumulator) {
-    assembledMessages.unshift({ role: 'system', content: systemAccumulator });
+    assembledMessages.push({ role: 'system', content: systemAccumulator });
   }
 
   // Fallback: append history if prompt_order didn't include it
