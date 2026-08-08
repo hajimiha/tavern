@@ -34,7 +34,7 @@
 - `Npc` 新增 `birthday: { month: number; day: number }`。
 - Adds `ScheduleSegment`, `FestivalActivity`, `Festival`, `NpcDailySchedule` 类型。
 
-- [ ] **Step 1: 写日期换算和季节失败测试**
+- [x] **Step 1: 写日期换算和季节失败测试**
 
 ```ts
 expect(getCalendarDate(1, 1)).toMatchObject({ year: 1, month: 1, date: 1, season: '春', weekday: '周一' })
@@ -43,9 +43,9 @@ expect(getCalendarDate(2, 1).weekday).toBe('周二')
 expect(getDayOfYear(12, 31)).toBe(365)
 ```
 
-- [ ] **Step 2: 运行 `pnpm vitest run src/game/calendar.test.ts --environment jsdom` 并确认因模块不存在失败**
+- [x] **Step 2: 运行 `pnpm vitest run src/game/calendar.test.ts --environment jsdom` 并确认因模块不存在失败**
 
-- [ ] **Step 3: 实现日期纯函数与类型**
+- [x] **Step 3: 实现日期纯函数与类型**
 
 ```ts
 export const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
@@ -59,7 +59,7 @@ export function getSeasonForDay(day: number): Season {
 }
 ```
 
-- [ ] **Step 4: 写十二节日、十五生日和动态行程失败测试**
+- [x] **Step 4: 写十二节日、十五生日和动态行程失败测试**
 
 ```ts
 expect(festivals).toHaveLength(12)
@@ -71,15 +71,15 @@ const festivalDay = getDayOfYear(1, 12)
 expect(getNpcPresence('loran', 1, festivalDay, 19 * 60).locationId).toBe('mayor-home')
 ```
 
-- [ ] **Step 5: 实现十五份日程与十二份节日数据**
+- [x] **Step 5: 实现十五份日程与十二份节日数据**
 
 每份日程必须覆盖 0–1440，无重叠、无空洞；柳安傍晚去图书馆，芙蕾雅有医院草药照护变体，弥奈有猎人帐篷递信变体，桃弥去图书馆查旧账，岩雀去矿洞验矿，塞拉、米菈和绮萝在共生所与农场间移动，黛芙去图书馆研究，凛去矿洞巡查，潮音与汐野在码头和图书馆间移动，维娜与苏槿在医院和村长家间移动。
 
 节日固定为：1/12 迎岁灯会、2/18 潮信祭、3/20 播种祭、4/16 林铃花会、5/12 风筝讯使节、6/21 长昼渔火祭、7/7 星河许愿夜、8/15 月穗丰收会、9/9 羽火锻造祭、10/31 薄雾巡游、11/16 回声矿灯祭、12/31 守夜落雪宴。
 
-- [ ] **Step 6: 运行日历测试并确认全部通过**
+- [x] **Step 6: 运行日历测试并确认全部通过**
 
-- [ ] **Step 7: 提交并推送**
+- [x] **Step 7: 提交并推送**
 
 ```powershell
 git add src/game/calendar.ts src/game/calendar.test.ts src/game/types.ts src/game/data.ts

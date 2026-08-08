@@ -48,6 +48,41 @@ export interface Npc {
   availableActions: NpcAction[]
   preferredGifts: string[]
   portraitByAffinity: Partial<Record<AffinityStage, string>>
+  birthday: { month: number; day: number }
+}
+
+export interface ScheduleSegment {
+  startMinute: number
+  endMinute: number
+  locationId: LocationId
+  activity: string
+}
+
+export interface NpcDailySchedule {
+  npcId: string
+  defaultSegments: ScheduleSegment[]
+  weeklyOverrides?: Partial<Record<number, ScheduleSegment[]>>
+}
+
+export interface FestivalActivity {
+  id: string
+  name: string
+  description: string
+  startMinute: number
+  endMinute: number
+}
+
+export interface Festival {
+  id: string
+  name: string
+  month: number
+  date: number
+  locationId: LocationId
+  startMinute: number
+  endMinute: number
+  participantIds: string[]
+  description: string
+  activities: [FestivalActivity, FestivalActivity, FestivalActivity]
 }
 
 export interface Location {
