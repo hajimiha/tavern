@@ -188,6 +188,7 @@ export type ModalType =
   | 'journal'
   | 'settings'
   | 'tavern'
+  | 'calendar'
   | 'plot'
   | 'npc'
   | 'dialogue'

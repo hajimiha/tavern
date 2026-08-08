@@ -1,10 +1,11 @@
-import { crops, locations, npcs } from '../../game/data'
+import { getNpcsAtLocation } from '../../game/calendar'
+import { crops, locations } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 
 export function ContextRail() {
   const { state } = useGame()
   const location = locations.find((item) => item.id === state.location) ?? locations[0]
-  const presentNpcs = npcs.filter((npc) => location.npcIds.includes(npc.id))
+  const presentNpcs = getNpcsAtLocation(state.location, state.year, state.day, state.minutes)
   const planted = state.plots.filter((plot) => plot.cropId).length
   const ready = state.plots.filter((plot) => plot.ready).length
   const dominantCropId = state.plots.find((plot) => plot.cropId)?.cropId
@@ -34,7 +35,7 @@ export function ContextRail() {
       ) : (
         <div className="present-list">
           <span className="eyebrow">当前在场</span>
-          {presentNpcs.length ? presentNpcs.map((npc) => <div key={npc.id}><i aria-hidden="true" /><span>{npc.name}</span><small>{npc.role}</small></div>) : <p>此处没有常驻村民。</p>}
+          {presentNpcs.length ? presentNpcs.map((npc) => <div key={npc.id}><i aria-hidden="true" /><span>{npc.name}</span><small>{npc.role}</small></div>) : <p>此刻没有村民停留。</p>}
         </div>
       )}
       <div className="context-tip">

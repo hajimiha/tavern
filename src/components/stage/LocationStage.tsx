@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import locationAtlas from '../../assets/pixel/location-atlas.webp'
+import { getNpcsAtLocation } from '../../game/calendar'
 import { locations, npcs } from '../../game/data'
 import { useGame } from '../../game/GameContext'
 import type { LocationId, ModalType } from '../../game/types'
@@ -38,7 +39,7 @@ export function LocationStage() {
   const { state, dispatch } = useGame()
   const [uploads, setUploads] = useState<Record<string, string>>({})
   const location = locations.find((item) => item.id === state.location)!
-  const presentNpcs = npcs.filter((npc) => location.npcIds.includes(npc.id))
+  const presentNpcs = getNpcsAtLocation(state.location, state.year, state.day, state.minutes)
   const selectedNpc = npcs.find((npc) => npc.id === state.selectedNpcId)
   const feature = primaryModal[state.location]
 
@@ -57,7 +58,7 @@ export function LocationStage() {
       <div className="location-story"><span>{location.name}</span><p>{location.description}</p>{feature && <button id={`location-feature-${state.location}`} className="primary-button" type="button" onClick={() => dispatch({ type: 'OPEN_MODAL', modal: feature.modal, npcId: presentNpcs[0]?.id })}>{feature.label}</button>}</div>
       <div className={`npc-stage-list count-${presentNpcs.length}`} aria-label="当前地点人物">
         {presentNpcs.map((npc) => <NpcPortrait key={npc.id} npc={npc} relationship={state.relationships[npc.id]} uploadedSource={uploads[npc.id]} onUpload={(file) => upload(npc.id, file)} onOpen={() => dispatch({ type: 'OPEN_MODAL', modal: 'npc', npcId: npc.id })} />)}
-        {!presentNpcs.length && <div className="empty-location-state"><strong>此处无人常驻</strong><p>环境互动与地点功能仍然可以使用。</p></div>}
+        {!presentNpcs.length && <div className="empty-location-state"><strong>此刻无人停留</strong><p>村民会依照每日行程与节日安排在不同地点活动。</p></div>}
       </div>
       {state.activeModal === 'npc' && selectedNpc && <NpcPanel npcId={selectedNpc.id} />}
       {state.activeModal === 'dialogue' && selectedNpc && <DialogueView npc={selectedNpc} />}

@@ -174,7 +174,7 @@ git push origin main
 - Consumes: `getNpcsAtLocation`, `getCalendarDate`, `getNpcPresence`, `isNpcBirthday`。
 - Produces: HUD `calendar` modal opener and correct live presence rendering。
 
-- [ ] **Step 1: 写非工作时段 NPC 不在常驻地点、休闲地点可见的失败组件测试**
+- [x] **Step 1: 写非工作时段 NPC 不在常驻地点、休闲地点可见的失败组件测试**
 
 ```tsx
 renderAt({ location: 'general-store', minutes: 19 * 60 })
@@ -183,20 +183,20 @@ renderAt({ location: 'library', minutes: 19 * 60 })
 expect(screen.getByText('柳安')).toBeInTheDocument()
 ```
 
-- [ ] **Step 2: 运行场景定向测试并确认静态 `npcIds` 导致失败**
+- [x] **Step 2: 运行场景定向测试并确认静态 `npcIds` 导致失败**
 
-- [ ] **Step 3: 替换 `LocationStage` 与 `ContextRail` 的静态在场判断**
+- [x] **Step 3: 替换 `LocationStage` 与 `ContextRail` 的静态在场判断**
 
-- [ ] **Step 4: 写 HUD 日历入口与人物生日档案失败测试**
+- [x] **Step 4: 写 HUD 日历入口与人物生日档案失败测试**
 
 ```tsx
 expect(screen.getByRole('button', { name: /打开岁时手册/ })).toHaveTextContent('06:30')
 expect(screen.getByText(/生日/)).toHaveTextContent('4月12日')
 ```
 
-- [ ] **Step 5: 把 HUD 时钟改为按钮，增加 `calendar`、`birthday`、`festival`、`hourglass` 和 `location` 图标映射，并在人物档案展示生日、当前行程和生日赠礼加成**
+- [x] **Step 5: 把 HUD 时钟改为按钮，增加 `calendar`、`birthday`、`festival`、`hourglass` 和 `location` 图标映射，并在人物档案展示生日、当前行程和生日赠礼加成**
 
-- [ ] **Step 6: 运行 `pnpm vitest run src/components/stage/LocationStage.test.tsx src/components/npc/NpcPanel.test.tsx src/components/shell/TopHud.test.tsx --environment jsdom` 并确认通过**
+- [x] **Step 6: 运行 `pnpm vitest run src/components/stage/LocationStage.test.tsx src/components/npc/NpcPanel.test.tsx src/components/shell/TopHud.test.tsx --environment jsdom` 并确认通过**
 
 - [ ] **Step 7: 提交并推送**
 

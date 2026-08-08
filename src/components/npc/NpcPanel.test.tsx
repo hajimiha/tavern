@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { GameProvider } from '../../game/GameContext'
 import { initialGameState } from '../../game/reducer'
 import { LocationStage } from '../stage/LocationStage'
+import { NpcPanel } from './NpcPanel'
 import { createTavernDatabase, type MistvaleTavernDatabase } from '../../sillytavern/database'
 import { createTavernRepository } from '../../sillytavern/repository'
 import { TavernProvider } from '../../tavern/TavernContext'
@@ -75,5 +76,20 @@ describe('NPC 关系与灵犀对话', () => {
     expect(screen.getAllByText('消耗 2 精力')).toHaveLength(2)
     await user.click(screen.getByRole('button', { name: '与洛岚交谈' }))
     expect(screen.queryByRole('dialog', { name: '与洛岚的酒馆会话' })).not.toBeInTheDocument()
+  })
+
+  it('人物档案展示生日、当前地点与当前活动', async () => {
+    const user = userEvent.setup()
+    render(
+      <GameProvider initialState={{ ...initialGameState, location: 'general-store', minutes: 10 * 60 }}>
+        <NpcPanel npcId="liuan" />
+      </GameProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: '查看柳安人物档案' }))
+    expect(screen.getByText('4月12日')).toBeVisible()
+    expect(screen.getByText('杂货店')).toBeVisible()
+    expect(screen.getByText('整理货架并经营柜台')).toBeVisible()
+    expect(screen.getByText(/生日当天赠送偏爱礼物，好感收益翻倍/)).toBeVisible()
   })
 })

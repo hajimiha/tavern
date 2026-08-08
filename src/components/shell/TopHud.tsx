@@ -1,4 +1,5 @@
 import { locations } from '../../game/data'
+import { formatClock, getCalendarDate } from '../../game/calendar'
 import { useGame } from '../../game/GameContext'
 import type { SkillId } from '../../game/types'
 import { GameIcon, type GameIconName } from '../icons/GameIcon'
@@ -12,17 +13,12 @@ const skillMeta: Record<SkillId, { label: string; icon: GameIconName }> = {
   magic: { label: '魔法', icon: 'magic' },
 }
 
-const formatTime = (minutes: number) => {
-  const hour = Math.floor(minutes / 60) % 24
-  const minute = minutes % 60
-  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-}
-
 export function TopHud() {
   const { state, dispatch } = useGame()
   const fullscreen = useFullscreen()
   const location = locations.find((item) => item.id === state.location) ?? locations[0]
-  const openModal = (modal: 'inventory' | 'journal' | 'settings' | 'tavern') => dispatch({ type: 'OPEN_MODAL', modal })
+  const calendar = getCalendarDate(state.year, state.day)
+  const openModal = (modal: 'inventory' | 'journal' | 'settings' | 'tavern' | 'calendar') => dispatch({ type: 'OPEN_MODAL', modal })
   const toggleFullscreen = async () => {
     if (await fullscreen.toggle()) return
     dispatch({ type: 'ADD_TOAST', toast: { tone: 'warning', title: '无法切换全屏', message: fullscreen.supported ? '浏览器拒绝了全屏请求，请检查站点权限。' : '当前浏览器不支持网页全屏。' } })
@@ -44,11 +40,12 @@ export function TopHud() {
         <span>{location.subtitle}</span>
       </div>
 
-      <div className="hud-clock" aria-label={`第${state.day}日 ${state.weekday} ${formatTime(state.minutes)} ${state.weather}`}>
-        <span>{state.season} · 第 {state.day} 日</span>
-        <strong>{formatTime(state.minutes)}</strong>
-        <span>{state.weekday} · {state.weather}</span>
-      </div>
+      <button id="hud-open-calendar" className="hud-clock" type="button" aria-label={`打开岁时手册，第${state.year}年${calendar.month}月${calendar.date}日 ${formatClock(state.minutes)}`} aria-expanded={state.activeModal === 'calendar'} onClick={() => openModal('calendar')}>
+        <GameIcon name="calendar" size={17} weight="duotone" />
+        <span>第{state.year}年 · {state.season}</span>
+        <strong>{formatClock(state.minutes)}</strong>
+        <span>{calendar.month}月{calendar.date}日 · {state.weekday} · {state.weather}</span>
+      </button>
 
       <div className="hud-resource energy-resource" aria-label={`精力 ${state.energy}/${state.maxEnergy}`}>
         <span className="resource-icon"><GameIcon name="health" weight="duotone" /></span>

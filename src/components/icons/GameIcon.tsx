@@ -39,6 +39,11 @@ import {
   ShieldCheck,
   CornersOut,
   CornersIn,
+  CalendarDots,
+  HourglassMedium,
+  Cake,
+  Confetti,
+  MapPin,
 } from '@phosphor-icons/react'
 
 const icons = {
@@ -82,6 +87,11 @@ const icons = {
   shield: ShieldCheck,
   fullscreen: CornersOut,
   fullscreenExit: CornersIn,
+  calendar: CalendarDots,
+  hourglass: HourglassMedium,
+  birthday: Cake,
+  festival: Confetti,
+  location: MapPin,
 }
 
 export type GameIconName = keyof typeof icons

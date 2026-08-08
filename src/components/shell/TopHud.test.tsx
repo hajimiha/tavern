@@ -12,8 +12,19 @@ describe('顶部游戏状态栏', () => {
     expect(screen.getByText('苔灯农场')).toBeVisible()
     expect(screen.getByText('5 / 5')).toBeVisible()
     expect(screen.getByText('500')).toBeVisible()
-    expect(screen.getByText('春 · 第 1 日')).toBeVisible()
+    expect(screen.getByText('第1年 · 春')).toBeVisible()
+    expect(screen.getByText(/1月1日/)).toBeVisible()
     expect(screen.getAllByTestId(/^hud-skill-/)).toHaveLength(5)
+  })
+
+  it('点击时间区打开岁时手册', async () => {
+    const user = userEvent.setup()
+    render(<GameProvider><TopHud /></GameProvider>)
+    const button = screen.getByRole('button', { name: /打开岁时手册/ })
+
+    expect(button).toHaveAttribute('id', 'hud-open-calendar')
+    await user.click(button)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('通过唯一按钮打开背包', async () => {

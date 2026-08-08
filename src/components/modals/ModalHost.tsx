@@ -17,7 +17,7 @@ import { SettingsModal } from './SettingsModal'
 
 const unmanaged = new Set<ModalType>([null, 'plot', 'npc', 'dialogue'])
 const titles: Partial<Record<Exclude<ModalType, null>, string>> = {
-  inventory: '行囊与成长档案', character: '角色属性', journal: '任务手册', settings: '游戏设置', tavern: '雾灯酒馆中枢', trade: '经营交易柜台', 'quest-board': '村民委托板', ranch: '魔物娘共生牧场', hunter: '猎人训练', hospital: '白槿诊所', library: '五行法术书塔', mine: '回声矿洞', battle: '回合制战斗', fishing: '潮汐钓场',
+  inventory: '行囊与成长档案', character: '角色属性', journal: '任务手册', settings: '游戏设置', tavern: '雾灯酒馆中枢', calendar: '岁时手册', trade: '经营交易柜台', 'quest-board': '村民委托板', ranch: '魔物娘共生牧场', hunter: '猎人训练', hospital: '白槿诊所', library: '五行法术书塔', mine: '回声矿洞', battle: '回合制战斗', fishing: '潮汐钓场',
 }
 
 function FutureFeature({ type }: { type: Exclude<ModalType, null> }) {
