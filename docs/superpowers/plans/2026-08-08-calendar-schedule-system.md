@@ -355,7 +355,7 @@ expect(twice.toasts).toHaveLength(1)
 
 - [x] **Step 4: 运行定向测试、`pnpm test:run`、`pnpm build` 和 `git diff --check`**
 
-结果：43 个测试文件、171 项测试全部通过；TypeScript 与 Vite 生产构建通过，`git diff --check` 无格式错误。
+结果：审查修复后的最终套件为 43 个测试文件、173 项测试全部通过；TypeScript 与 Vite 生产构建通过，`git diff --check` 无格式错误。
 
 - [x] **Step 5: 启动本地 Vite，使用真实 Edge/Playwright 验证 1440×1000 与 390×844**
 
@@ -369,7 +369,7 @@ expect(twice.toasts).toHaveLength(1)
 
 结果：独立审查无 Critical；3 个 Important 已全部修复并加入回归测试——地图按预计抵达时刻显示动态人物、异常年份钳制在安全范围、v2 迁移只补新增岁时世界书而不复活玩家删除的旧默认书。3 个 Minor 也一并处理。
 
-- [ ] **Step 8: 最终提交并推送**
+- [x] **Step 8: 最终提交并推送**
 
 ```powershell
 git add README.md task_plan.md findings.md progress.md src/components/feedback/ToastRegion.tsx src/components/feedback/ToastRegion.test.tsx src/game/reducer.ts src/game/reducer.test.ts
